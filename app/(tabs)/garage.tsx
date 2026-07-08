@@ -65,12 +65,12 @@ function HeroCard() {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: 560,
+        duration: animations.entrance,
         useNativeDriver: true,
       }),
       Animated.timing(scale, {
         toValue: 1,
-        duration: 560,
+        duration: animations.entrance,
         useNativeDriver: true,
       }),
     ]).start();

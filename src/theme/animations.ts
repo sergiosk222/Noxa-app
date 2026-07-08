@@ -4,5 +4,5 @@ export const animations = {
   slow: 420,
   entrance: 420,
   entranceDistance: 12,
-  pressedScale: 0.98,
+  pressedScale: 0.97,
 } as const;
