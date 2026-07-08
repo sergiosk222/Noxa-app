@@ -5,16 +5,16 @@ import { radius } from '@/src/theme/radius';
 import { spacing } from '@/src/theme/spacing';
 import { typography } from '@/src/theme/typography';
 
-export default function LiveMapScreen() {
+export default function EventsScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.content}>
         <View style={styles.accentLine} />
-        <Text style={styles.title}>Live Map</Text>
-        <Text style={styles.subtitle}>The center of Noxa, ready for the road scene.</Text>
+        <Text style={styles.title}>Events</Text>
+        <Text style={styles.subtitle}>Premium meets, launches, and drives.</Text>
         <View style={styles.card}>
           <Text style={styles.cardEyebrow}>Coming soon</Text>
-          <Text style={styles.cardText}>A future live presence layer for drivers and crews. Placeholder only — no real map or routing yet.</Text>
+          <Text style={styles.cardText}>Discover curated car-culture events with clear details and a clean planning surface.</Text>
         </View>
       </View>
     </SafeAreaView>
