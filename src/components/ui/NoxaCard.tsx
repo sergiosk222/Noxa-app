@@ -13,8 +13,8 @@ export function NoxaCard({ children }: NoxaCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    padding: spacing.lg,
-    borderRadius: radius.xl,
+    padding: spacing.xl,
+    borderRadius: radius.card,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,

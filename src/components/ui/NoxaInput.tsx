@@ -30,9 +30,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   input: {
-    minHeight: 54,
+    minHeight: 56,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
     borderColor: colors.border,

@@ -33,7 +33,7 @@ const profile = {
   ] satisfies { label: string; icon: IoniconName }[],
 };
 
-function useEntryAnimation(delay = 0, distance = 18) {
+function useEntryAnimation(delay = 0, distance = animations.entranceDistance) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(distance)).current;
 
@@ -41,13 +41,13 @@ function useEntryAnimation(delay = 0, distance = 18) {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: animations.slow,
+        duration: animations.entrance,
         delay,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
         toValue: 0,
-        duration: animations.slow,
+        duration: animations.entrance,
         delay,
         useNativeDriver: true,
       }),
@@ -214,12 +214,12 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.78,
-    transform: [{ scale: 0.98 }],
+    transform: [{ translateY: 1 }, { scale: 0.98 }],
   },
   hero: {
     alignItems: 'center',
     padding: spacing.xxl,
-    borderRadius: radius.xl,
+    borderRadius: radius.card,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.text,
-    fontSize: typography.title,
+    fontSize: typography.sectionTitle,
     fontWeight: '900',
     letterSpacing: -0.4,
   },
