@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { NoxaButton, NoxaCard, NoxaScreen } from '@/src/components/ui';
+import { NoxaAnimatedCard, NoxaButton, NoxaScreen } from '@/src/components/ui';
 import { colors, radius, spacing, typography } from '@/src/theme';
 
 export default function WelcomeScreen() {
@@ -16,14 +16,14 @@ export default function WelcomeScreen() {
           <View style={styles.logoUnderline} />
         </View>
 
-        <NoxaCard>
+        <NoxaAnimatedCard delay={80}>
           <View style={styles.heroCard}>
             <View style={styles.cardGlow} />
             <Text style={styles.eyebrow}>MIDNIGHT SOCIAL CLUB</Text>
             <Text style={styles.headline}>Drive the night.</Text>
             <Text style={styles.subtitle}>Find crews, events, and drivers around you.</Text>
           </View>
-        </NoxaCard>
+        </NoxaAnimatedCard>
 
         <View style={styles.actions}>
           <NoxaButton fullWidth title="Continue as Guest" onPress={() => router.replace('/(tabs)')} />

@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { animations } from '@/src/theme/animations';
 import { colors } from '@/src/theme/colors';
 import { radius } from '@/src/theme/radius';
 import { spacing } from '@/src/theme/spacing';
@@ -9,21 +12,35 @@ import { typography } from '@/src/theme/typography';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
+function useTabScale(focused: boolean, activeScale: number) {
+  const scale = useSharedValue(focused ? activeScale : 1);
+
+  useEffect(() => {
+    scale.value = withTiming(focused ? activeScale : 1, { duration: animations.base, easing: Easing.out(Easing.cubic) });
+  }, [activeScale, focused, scale]);
+
+  return useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+}
+
 function TabIcon({ name, color, focused }: { name: IconName; color: string; focused: boolean }) {
+  const animatedStyle = useTabScale(focused, 1.06);
+
   return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+    <Animated.View style={[styles.iconWrap, focused && styles.iconWrapActive, animatedStyle]}>
       <Ionicons name={name} size={22} color={color} />
       {focused ? <View style={styles.activeIndicator} /> : null}
-    </View>
+    </Animated.View>
   );
 }
 
 function MapIcon({ color, focused }: { color: string; focused: boolean }) {
+  const animatedStyle = useTabScale(focused, 1.05);
+
   return (
-    <View style={[styles.mapIcon, focused && styles.mapIconActive]}>
+    <Animated.View style={[styles.mapIcon, focused && styles.mapIconActive, animatedStyle]}>
       <Ionicons name="map" size={26} color={color} />
       {focused ? <View style={styles.mapActiveIndicator} /> : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -125,6 +142,10 @@ const styles = StyleSheet.create({
   },
   iconWrapActive: {
     backgroundColor: 'rgba(255,45,45,0.14)',
+    shadowColor: colors.accent,
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
   },
   activeIndicator: {
     position: 'absolute',

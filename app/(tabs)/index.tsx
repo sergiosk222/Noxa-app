@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { animations } from '@/src/theme/animations';
 import { colors } from '@/src/theme/colors';
 import { radius } from '@/src/theme/radius';
 import { spacing } from '@/src/theme/spacing';
@@ -90,8 +91,8 @@ function VehicleMarker({ left, top, rotation }: (typeof vehicleMarkers)[number])
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1800, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 420, easing: Easing.in(Easing.quad), useNativeDriver: true }),
       ]),
     ).start();
   }, [pulse]);
@@ -129,7 +130,7 @@ function EventMarker() {
 
   useEffect(() => {
     Animated.loop(
-      Animated.timing(pulse, { toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
     ).start();
   }, [pulse]);
 
@@ -159,7 +160,7 @@ function EventCard() {
   const entrance = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(entrance, { toValue: 1, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(entrance, { toValue: 1, duration: animations.entrance, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [entrance]);
 
   return (
@@ -168,7 +169,7 @@ function EventCard() {
         styles.eventCard,
         {
           opacity: entrance,
-          transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+          transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [animations.entranceDistance, 0] }) }],
         },
       ]}>
       <View>
