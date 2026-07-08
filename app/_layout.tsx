@@ -22,6 +22,7 @@ export default function RootLayout() {
     <ThemeProvider value={noxaTheme}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="welcome" />
         <Stack.Screen name="(tabs)" />
       </Stack>
       <StatusBar style="light" />

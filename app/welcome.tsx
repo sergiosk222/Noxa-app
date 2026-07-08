@@ -1,0 +1,197 @@
+import { router } from 'expo-router';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+
+import { colors } from '@/src/theme/colors';
+import { radius } from '@/src/theme/radius';
+import { spacing } from '@/src/theme/spacing';
+import { typography } from '@/src/theme/typography';
+
+function SecondaryButton({ label }: { label: string }) {
+  return (
+    <Pressable accessibilityRole="button" style={styles.secondaryButton}>
+      <Text style={styles.secondaryButtonText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export default function WelcomeScreen() {
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.backgroundGlow} />
+      <View style={styles.topLight} />
+
+      <View style={styles.content}>
+        <View style={styles.brandBlock}>
+          <Text style={styles.logo}>NOXA</Text>
+          <View style={styles.logoUnderline} />
+        </View>
+
+        <View style={styles.heroCard}>
+          <View style={styles.cardGlow} />
+          <Text style={styles.eyebrow}>MIDNIGHT SOCIAL CLUB</Text>
+          <Text style={styles.headline}>Drive the night.</Text>
+          <Text style={styles.subtitle}>Find crews, events, and drivers around you.</Text>
+        </View>
+
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.replace('/(tabs)')}
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
+          >
+            <Text style={styles.primaryButtonText}>Continue as Guest</Text>
+          </Pressable>
+
+          <View style={styles.secondaryActions}>
+            <SecondaryButton label="Sign in with Email" />
+            <SecondaryButton label="Create Account" />
+          </View>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#000000',
+    overflow: 'hidden',
+  },
+  backgroundGlow: {
+    position: 'absolute',
+    left: -120,
+    right: -120,
+    bottom: -180,
+    height: 360,
+    borderRadius: 360,
+    backgroundColor: 'rgba(255,36,36,0.12)',
+    shadowColor: colors.accent,
+    shadowOpacity: 0.42,
+    shadowRadius: 90,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  topLight: {
+    position: 'absolute',
+    top: 0,
+    alignSelf: 'center',
+    width: 220,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.36)',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.5,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
+  },
+  brandBlock: {
+    alignItems: 'center',
+  },
+  logo: {
+    color: colors.text,
+    fontSize: typography.title,
+    fontWeight: '900',
+    letterSpacing: 12,
+    marginLeft: 12,
+  },
+  logoUnderline: {
+    width: 52,
+    height: 2,
+    marginTop: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.8,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  heroCard: {
+    minHeight: 330,
+    justifyContent: 'flex-end',
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    backgroundColor: 'rgba(16,18,23,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+  },
+  cardGlow: {
+    position: 'absolute',
+    top: -90,
+    right: -80,
+    width: 220,
+    height: 220,
+    borderRadius: 220,
+    backgroundColor: 'rgba(255,36,36,0.14)',
+  },
+  eyebrow: {
+    color: colors.accent,
+    fontSize: typography.caption,
+    fontWeight: '800',
+    letterSpacing: 3,
+    marginBottom: spacing.md,
+  },
+  headline: {
+    color: colors.text,
+    fontSize: 46,
+    fontWeight: '900',
+    letterSpacing: -1.4,
+    lineHeight: 50,
+  },
+  subtitle: {
+    maxWidth: 280,
+    marginTop: spacing.md,
+    color: colors.textMuted,
+    fontSize: typography.subtitle,
+    fontWeight: '500',
+    lineHeight: 26,
+  },
+  actions: {
+    gap: spacing.md,
+  },
+  primaryButton: {
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    shadowColor: colors.accent,
+    shadowOpacity: 0.38,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
+  },
+  primaryButtonPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.99 }],
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: typography.body,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+  secondaryActions: {
+    gap: spacing.sm,
+  },
+  secondaryButton: {
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  secondaryButtonText: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: '700',
+  },
+});

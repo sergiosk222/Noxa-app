@@ -45,7 +45,7 @@ export default function SplashScreen() {
 
     const timer = setTimeout(() => {
       console.log('Splash: navigate');
-      router.replace('/(tabs)');
+      router.replace('/welcome');
     }, SPLASH_COMPLETE_MS);
 
     return () => {
