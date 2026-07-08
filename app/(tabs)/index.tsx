@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -291,7 +292,7 @@ const quickStats = [
   { key: 'followers', icon: '👥', label: 'Followers' },
 ] as const;
 
-function DriverPreviewCard({ driver, onClose }: { driver: DriverPreview; onClose: () => void }) {
+function DriverPreviewCard({ driver, onClose, onViewProfile }: { driver: DriverPreview; onClose: () => void; onViewProfile: (driver: DriverPreview) => void }) {
   const translateY = useRef(new Animated.Value(430)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
@@ -373,7 +374,7 @@ function DriverPreviewCard({ driver, onClose }: { driver: DriverPreview; onClose
         </View>
 
         <View style={styles.actionRow}>
-          <TouchableOpacity activeOpacity={0.86} style={styles.profileButton}>
+          <TouchableOpacity activeOpacity={0.86} onPress={() => onViewProfile(driver)} style={styles.profileButton}>
             <Text style={styles.profileButtonText}>View Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.82} style={styles.messageButton}>
@@ -387,6 +388,12 @@ function DriverPreviewCard({ driver, onClose }: { driver: DriverPreview; onClose
 
 export default function LiveMapScreen() {
   const [selectedDriver, setSelectedDriver] = useState<DriverPreview | null>(null);
+  const router = useRouter();
+
+  const openDriverProfile = (driver: DriverPreview) => {
+    setSelectedDriver(null);
+    router.push(`/driver-profile/${driver.id}`);
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -408,7 +415,7 @@ export default function LiveMapScreen() {
         <FakeLiveMap onDriverPress={setSelectedDriver} />
         <EventCard />
       </View>
-      {selectedDriver ? <DriverPreviewCard driver={selectedDriver} onClose={() => setSelectedDriver(null)} /> : null}
+      {selectedDriver ? <DriverPreviewCard driver={selectedDriver} onClose={() => setSelectedDriver(null)} onViewProfile={openDriverProfile} /> : null}
     </SafeAreaView>
   );
 }
