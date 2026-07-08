@@ -13,12 +13,21 @@ const vehicleMarkers = [
   { id: 'rx7', left: '28%', top: '68%', rotation: '18deg' },
 ] as const;
 
-const gridLines = Array.from({ length: 9 }, (_, index) => index);
+const gridLines = Array.from({ length: 7 }, (_, index) => index);
 const roadLines = [
-  { id: 'main', top: '38%', left: '-12%', width: '130%', rotation: '-18deg' },
-  { id: 'north', top: '17%', left: '8%', width: '84%', rotation: '25deg' },
-  { id: 'south', top: '70%', left: '12%', width: '92%', rotation: '16deg' },
-  { id: 'cross', top: '49%', left: '22%', width: '70%', rotation: '62deg' },
+  { id: 'main', top: '39%', left: '-12%', width: '132%', rotation: '-18deg', emphasis: true },
+  { id: 'north', top: '18%', left: '5%', width: '88%', rotation: '24deg', emphasis: false },
+  { id: 'south', top: '70%', left: '10%', width: '95%', rotation: '15deg', emphasis: false },
+  { id: 'cross', top: '48%', left: '20%', width: '74%', rotation: '61deg', emphasis: false },
+  { id: 'harbor', top: '58%', left: '-6%', width: '66%', rotation: '-44deg', emphasis: false },
+  { id: 'midtown', top: '29%', left: '42%', width: '68%', rotation: '72deg', emphasis: false },
+] as const;
+
+const districtBlocks = [
+  { id: 'west', style: 'districtBlockOne' },
+  { id: 'uptown', style: 'districtBlockTwo' },
+  { id: 'east', style: 'districtBlockThree' },
+  { id: 'harbor', style: 'districtBlockFour' },
 ] as const;
 
 type ActionButtonProps = {
@@ -43,6 +52,18 @@ function VehicleMarker({ left, top, rotation }: (typeof vehicleMarkers)[number])
   );
 }
 
+function CrewMarker() {
+  return (
+    <View style={styles.crewMarker}>
+      <View style={styles.crewHalo} />
+      <View style={styles.crewCore}>
+        <Ionicons name="people" size={16} color={colors.text} />
+      </View>
+      <Text style={styles.markerCaption}>CREW</Text>
+    </View>
+  );
+}
+
 function EventMarker() {
   return (
     <View style={styles.eventMarker}>
@@ -63,29 +84,34 @@ function FakeLiveMap() {
       <View style={styles.mapVignetteTop} />
       <View style={styles.mapVignetteBottom} />
 
+      {districtBlocks.map((block) => (
+        <View key={block.id} style={styles[block.style]} />
+      ))}
+
       {gridLines.map((line) => (
-        <View key={`vertical-${line}`} style={[styles.gridLineVertical, { left: `${line * 12.5}%` }]} />
+        <View key={`vertical-${line}`} style={[styles.gridLineVertical, { left: `${8 + line * 14}%` }]} />
       ))}
       {gridLines.map((line) => (
-        <View key={`horizontal-${line}`} style={[styles.gridLineHorizontal, { top: `${line * 12.5}%` }]} />
+        <View key={`horizontal-${line}`} style={[styles.gridLineHorizontal, { top: `${9 + line * 13}%` }]} />
       ))}
 
       {roadLines.map((road) => (
         <View
           key={road.id}
-          style={[styles.road, { left: road.left, top: road.top, width: road.width, transform: [{ rotate: road.rotation }] }]}
+          style={[
+            styles.road,
+            road.emphasis && styles.roadEmphasis,
+            { left: road.left, top: road.top, width: road.width, transform: [{ rotate: road.rotation }] },
+          ]}
         >
-          <View style={styles.roadDash} />
+          <View style={[styles.roadDash, road.emphasis && styles.roadDashEmphasis]} />
         </View>
       ))}
-
-      <View style={styles.districtBlobOne} />
-      <View style={styles.districtBlobTwo} />
-      <View style={styles.districtBlobThree} />
 
       {vehicleMarkers.map((marker) => (
         <VehicleMarker key={marker.id} {...marker} />
       ))}
+      <CrewMarker />
       <EventMarker />
     </View>
   );
@@ -98,7 +124,10 @@ export default function LiveMapScreen() {
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>N</Text>
         </View>
-        <Text style={styles.logo}>NOXA</Text>
+        <View style={styles.logoWrap}>
+          <View style={styles.logoSpeedLine} />
+          <Text style={styles.logo}>NOXA</Text>
+        </View>
         <View style={styles.headerActions}>
           <HeaderAction icon="search" accessibilityLabel="Search" />
           <HeaderAction icon="notifications" accessibilityLabel="Notifications" />
@@ -130,15 +159,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    height: 76,
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(8,10,15,0.72)',
   },
   avatar: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
@@ -151,29 +183,46 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '900',
   },
-  logo: {
+  logoWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+  },
+  logoSpeedLine: {
+    width: 42,
+    height: 2,
+    marginBottom: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.38)',
+    backgroundColor: 'rgba(255,36,36,0.92)',
+    shadowColor: colors.accent,
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  logo: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
-    letterSpacing: 7,
+    letterSpacing: 6.5,
   },
   headerActions: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
   headerAction: {
-    width: 42,
-    height: 42,
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
   },
   content: {
     flex: 1,
@@ -185,8 +234,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 34,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: '#080A0F',
+    borderColor: 'rgba(255,255,255,0.11)',
+    backgroundColor: '#07090E',
     shadowColor: '#000',
     shadowOpacity: 0.45,
     shadowRadius: 30,
@@ -200,7 +249,7 @@ const styles = StyleSheet.create({
     right: -50,
     height: 230,
     borderRadius: 120,
-    backgroundColor: 'rgba(255,36,36,0.08)',
+    backgroundColor: 'rgba(255,36,36,0.075)',
   },
   mapVignetteBottom: {
     position: 'absolute',
@@ -209,36 +258,46 @@ const styles = StyleSheet.create({
     right: -80,
     height: 260,
     borderRadius: 130,
-    backgroundColor: 'rgba(255,255,255,0.035)',
+    backgroundColor: 'rgba(70,82,105,0.09)',
   },
   gridLineVertical: {
     position: 'absolute',
     top: 0,
     bottom: 0,
     width: 1,
-    backgroundColor: 'rgba(255,255,255,0.035)',
+    backgroundColor: 'rgba(255,255,255,0.018)',
   },
   gridLineHorizontal: {
     position: 'absolute',
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.032)',
+    backgroundColor: 'rgba(255,255,255,0.016)',
   },
   road: {
     position: 'absolute',
-    height: 34,
+    height: 24,
     justifyContent: 'center',
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.035)',
+    backgroundColor: 'rgba(255,255,255,0.030)',
+  },
+  roadEmphasis: {
+    height: 30,
+    backgroundColor: 'rgba(255,255,255,0.045)',
   },
   roadDash: {
     height: 1,
     marginHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.09)',
   },
-  districtBlobOne: {
+  roadDashEmphasis: {
+    height: 2,
+    backgroundColor: 'rgba(255,36,36,0.22)',
+  },
+  districtBlockOne: {
     position: 'absolute',
     left: '8%',
     top: '10%',
@@ -248,7 +307,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.035)',
     transform: [{ rotate: '-16deg' }],
   },
-  districtBlobTwo: {
+  districtBlockTwo: {
     position: 'absolute',
     right: '7%',
     top: '35%',
@@ -258,7 +317,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,36,36,0.045)',
     transform: [{ rotate: '18deg' }],
   },
-  districtBlobThree: {
+  districtBlockThree: {
     position: 'absolute',
     left: '20%',
     bottom: '12%',
@@ -268,14 +327,29 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.028)',
     transform: [{ rotate: '11deg' }],
   },
+
+  districtBlockFour: {
+    position: 'absolute',
+    right: '16%',
+    bottom: '5%',
+    width: 104,
+    height: 138,
+    borderRadius: 28,
+    backgroundColor: 'rgba(70,82,105,0.075)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.035)',
+    transform: [{ rotate: '-22deg' }],
+  },
   vehicleMarker: {
     position: 'absolute',
-    width: 42,
-    height: 42,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.38)',
+    backgroundColor: 'rgba(255,36,36,0.92)',
     shadowColor: colors.accent,
     shadowOpacity: 0.7,
     shadowRadius: 18,
@@ -284,10 +358,44 @@ const styles = StyleSheet.create({
   },
   vehicleGlow: {
     position: 'absolute',
-    width: 70,
-    height: 70,
+    width: 58,
+    height: 58,
     borderRadius: radius.pill,
     backgroundColor: 'rgba(255,36,36,0.14)',
+  },
+  crewMarker: {
+    position: 'absolute',
+    top: '30%',
+    left: '49%',
+    alignItems: 'center',
+  },
+  crewHalo: {
+    position: 'absolute',
+    top: -10,
+    width: 58,
+    height: 58,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  crewCore: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.lg,
+    backgroundColor: '#2A303D',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.30)',
+    transform: [{ rotate: '45deg' }],
+  },
+  markerCaption: {
+    marginTop: spacing.xs,
+    color: colors.textMuted,
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   eventMarker: {
     position: 'absolute',
@@ -340,7 +448,7 @@ const styles = StyleSheet.create({
     left: spacing.lg,
     right: spacing.lg,
     bottom: 128,
-    padding: spacing.lg,
+    padding: spacing.md,
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
@@ -359,27 +467,29 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   cardTitle: {
-    marginTop: spacing.sm,
+    marginTop: 6,
     color: colors.text,
-    fontSize: 30,
+    fontSize: 26,
     fontWeight: '900',
     letterSpacing: -0.7,
   },
   cardSubtitle: {
-    marginTop: spacing.xs,
+    marginTop: 3,
     color: colors.textMuted,
-    fontSize: typography.body,
+    fontSize: typography.caption,
     fontWeight: '600',
   },
   eventButton: {
-    marginTop: spacing.lg,
-    height: 50,
+    marginTop: spacing.md,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.38)',
+    backgroundColor: 'rgba(255,36,36,0.92)',
     shadowColor: colors.accent,
     shadowOpacity: 0.42,
     shadowRadius: 18,
