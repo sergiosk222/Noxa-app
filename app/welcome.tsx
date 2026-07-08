@@ -1,22 +1,12 @@
 import { router } from 'expo-router';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '@/src/theme/colors';
-import { radius } from '@/src/theme/radius';
-import { spacing } from '@/src/theme/spacing';
-import { typography } from '@/src/theme/typography';
-
-function SecondaryButton({ label }: { label: string }) {
-  return (
-    <Pressable accessibilityRole="button" style={styles.secondaryButton}>
-      <Text style={styles.secondaryButtonText}>{label}</Text>
-    </Pressable>
-  );
-}
+import { NoxaButton, NoxaCard, NoxaScreen } from '@/src/components/ui';
+import { colors, radius, spacing, typography } from '@/src/theme';
 
 export default function WelcomeScreen() {
   return (
-    <SafeAreaView style={styles.screen}>
+    <NoxaScreen padded={false}>
       <View style={styles.backgroundGlow} />
       <View style={styles.topLight} />
 
@@ -26,38 +16,29 @@ export default function WelcomeScreen() {
           <View style={styles.logoUnderline} />
         </View>
 
-        <View style={styles.heroCard}>
-          <View style={styles.cardGlow} />
-          <Text style={styles.eyebrow}>MIDNIGHT SOCIAL CLUB</Text>
-          <Text style={styles.headline}>Drive the night.</Text>
-          <Text style={styles.subtitle}>Find crews, events, and drivers around you.</Text>
-        </View>
+        <NoxaCard>
+          <View style={styles.heroCard}>
+            <View style={styles.cardGlow} />
+            <Text style={styles.eyebrow}>MIDNIGHT SOCIAL CLUB</Text>
+            <Text style={styles.headline}>Drive the night.</Text>
+            <Text style={styles.subtitle}>Find crews, events, and drivers around you.</Text>
+          </View>
+        </NoxaCard>
 
         <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.replace('/(tabs)')}
-            style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-          >
-            <Text style={styles.primaryButtonText}>Continue as Guest</Text>
-          </Pressable>
+          <NoxaButton fullWidth title="Continue as Guest" onPress={() => router.replace('/(tabs)')} />
 
           <View style={styles.secondaryActions}>
-            <SecondaryButton label="Sign in with Email" />
-            <SecondaryButton label="Create Account" />
+            <NoxaButton fullWidth title="Sign in with Email" variant="secondary" />
+            <NoxaButton fullWidth title="Create Account" variant="secondary" />
           </View>
         </View>
       </View>
-    </SafeAreaView>
+    </NoxaScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#000000',
-    overflow: 'hidden',
-  },
   backgroundGlow: {
     position: 'absolute',
     left: -120,
@@ -114,11 +95,6 @@ const styles = StyleSheet.create({
   heroCard: {
     minHeight: 330,
     justifyContent: 'flex-end',
-    padding: spacing.lg,
-    borderRadius: radius.xl,
-    backgroundColor: 'rgba(16,18,23,0.72)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
     overflow: 'hidden',
   },
   cardGlow: {
@@ -155,43 +131,7 @@ const styles = StyleSheet.create({
   actions: {
     gap: spacing.md,
   },
-  primaryButton: {
-    height: 58,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colors.accent,
-    shadowColor: colors.accent,
-    shadowOpacity: 0.38,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 12,
-  },
-  primaryButtonPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: typography.body,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-  },
   secondaryActions: {
     gap: spacing.sm,
-  },
-  secondaryButton: {
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.045)',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryButtonText: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '700',
   },
 });
