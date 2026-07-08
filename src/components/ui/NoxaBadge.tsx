@@ -19,9 +19,12 @@ export function NoxaBadge({ label, variant = 'default' }: NoxaBadgeProps) {
 
 const styles = StyleSheet.create({
   badge: {
+    minHeight: 26,
     alignSelf: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
+    paddingVertical: spacing.xxs,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
@@ -43,7 +46,8 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: typography.badge,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   defaultText: {
     color: colors.textMuted,

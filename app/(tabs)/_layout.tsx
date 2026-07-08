@@ -5,7 +5,6 @@ import { StyleSheet, View } from 'react-native';
 import { colors } from '@/src/theme/colors';
 import { radius } from '@/src/theme/radius';
 import { spacing } from '@/src/theme/spacing';
-import { typography } from '@/src/theme/typography';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -92,8 +91,8 @@ const styles = StyleSheet.create({
     left: spacing.md,
     right: spacing.md,
     bottom: spacing.md,
-    height: 78,
-    paddingTop: spacing.md,
+    height: 82,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.md,
     backgroundColor: colors.surface,
     borderTopWidth: 0,
@@ -110,15 +109,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   label: {
-    fontSize: typography.caption,
+    fontSize: 11,
     fontWeight: '700',
   },
   mapLabel: {
     color: colors.accent,
   },
   iconWrap: {
-    width: 40,
-    height: 32,
+    width: 38,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
@@ -128,16 +127,16 @@ const styles = StyleSheet.create({
   },
   activeIndicator: {
     position: 'absolute',
-    bottom: -6,
+    bottom: -5,
     width: 16,
     height: 2,
     borderRadius: radius.pill,
     backgroundColor: colors.accent,
   },
   mapIcon: {
-    width: 58,
-    height: 58,
-    marginTop: -spacing.lg,
+    width: 56,
+    height: 56,
+    marginTop: -spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,

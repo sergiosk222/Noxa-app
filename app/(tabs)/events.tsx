@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: 156,
+    paddingBottom: 164,
     gap: spacing.lg,
   },
   iconButton: {
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: 1 }, { scale: 0.98 }],
   },
   featuredCard: {
-    minHeight: 292,
+    minHeight: 284,
     overflow: 'hidden',
     justifyContent: 'space-between',
     padding: spacing.xl,
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.md,
+    gap: spacing.sm,
     ...shadows.card,
   },
   redAccent: {
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.lg,
     right: spacing.lg,
-    bottom: 100,
+    bottom: 106,
     alignItems: 'center',
   },
   createButton: {

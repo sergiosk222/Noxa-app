@@ -32,10 +32,10 @@ export function NoxaButton({ title, onPress, variant = 'primary', disabled = fal
 
 const styles = StyleSheet.create({
   base: {
-    height: 56,
+    height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     borderRadius: radius.pill,
   },
   fullWidth: {
@@ -62,8 +62,8 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: typography.body,
-    fontWeight: '900',
-    letterSpacing: 0.2,
+    fontWeight: '800',
+    letterSpacing: 0.1,
   },
   primaryText: {
     color: colors.text,
