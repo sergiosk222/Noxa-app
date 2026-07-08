@@ -13,6 +13,7 @@ function TabIcon({ name, color, focused }: { name: IconName; color: string; focu
   return (
     <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
       <Ionicons name={name} size={22} color={color} />
+      {focused ? <View style={styles.activeIndicator} /> : null}
     </View>
   );
 }
@@ -21,6 +22,7 @@ function MapIcon({ color, focused }: { color: string; focused: boolean }) {
   return (
     <View style={[styles.mapIcon, focused && styles.mapIconActive]}>
       <Ionicons name="map" size={26} color={color} />
+      {focused ? <View style={styles.mapActiveIndicator} /> : null}
     </View>
   );
 }
@@ -90,8 +92,8 @@ const styles = StyleSheet.create({
     left: spacing.md,
     right: spacing.md,
     bottom: spacing.md,
-    height: 76,
-    paddingTop: spacing.sm,
+    height: 78,
+    paddingTop: spacing.md,
     paddingBottom: spacing.md,
     backgroundColor: colors.surface,
     borderTopWidth: 0,
@@ -99,7 +101,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: colors.accent,
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.22,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
     elevation: 12,
@@ -115,14 +117,22 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   iconWrap: {
-    width: 38,
-    height: 30,
+    width: 40,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
   },
   iconWrapActive: {
-    backgroundColor: 'rgba(255,36,36,0.12)',
+    backgroundColor: 'rgba(255,45,45,0.14)',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -6,
+    width: 16,
+    height: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
   },
   mapIcon: {
     width: 58,
@@ -142,5 +152,13 @@ const styles = StyleSheet.create({
   },
   mapIconActive: {
     backgroundColor: colors.accentDark,
+  },
+  mapActiveIndicator: {
+    position: 'absolute',
+    bottom: 7,
+    width: 20,
+    height: 2,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.72)',
   },
 });

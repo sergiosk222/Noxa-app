@@ -21,7 +21,7 @@ const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xxs,
+    paddingVertical: 5,
     borderRadius: radius.pill,
     borderWidth: 1,
   },
@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(245,158,11,0.32)',
   },
   text: {
-    fontSize: typography.caption,
-    fontWeight: '800',
+    fontSize: typography.badge,
+    fontWeight: '900',
   },
   defaultText: {
     color: colors.textMuted,

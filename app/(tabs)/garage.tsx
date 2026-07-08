@@ -35,19 +35,19 @@ const car = {
 
 function useEntryAnimation(delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(18)).current;
+  const translateY = useRef(new Animated.Value(animations.entranceDistance)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: animations.slow,
+        duration: animations.entrance,
         delay,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
         toValue: 0,
-        duration: animations.slow,
+        duration: animations.entrance,
         delay,
         useNativeDriver: true,
       }),
@@ -226,11 +226,11 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.82,
-    transform: [{ scale: 0.97 }],
+    transform: [{ translateY: 1 }, { scale: 0.98 }],
   },
   heroCard: {
     height: 390,
-    borderRadius: radius.xl,
+    borderRadius: radius.card,
     overflow: 'hidden',
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   heroImageRadius: {
-    borderRadius: radius.xl,
+    borderRadius: radius.card,
   },
   heroShade: {
     ...StyleSheet.absoluteFillObject,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   buildName: {
     marginTop: spacing.xxs,
     color: colors.textMuted,
-    fontSize: typography.subtitle,
+    fontSize: typography.cardTitle,
     fontWeight: '700',
   },
   statsGrid: {
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   statValue: {
     minWidth: 116,
     color: colors.text,
-    fontSize: typography.title,
+    fontSize: typography.sectionTitle,
     fontWeight: '900',
   },
   statLabel: {
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   activityTitle: {
     marginTop: spacing.xs,
     color: colors.text,
-    fontSize: typography.title,
+    fontSize: typography.sectionTitle,
     fontWeight: '900',
   },
   activityMeta: {

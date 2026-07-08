@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   eventCore: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 2, borderColor: 'rgba(255,255,255,0.72)', backgroundColor: colors.accentDark, shadowColor: colors.accent, shadowOpacity: 0.9, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 14 },
   eventLabel: { marginTop: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: 'rgba(5,6,8,0.82)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   eventLabelText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  eventCard: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 128, padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: '#11141B', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 18 }, elevation: 18 },
+  eventCard: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 128, padding: spacing.md, borderRadius: radius.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: '#11141B', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 18 }, elevation: 18 },
   cardKicker: { color: colors.accent, fontSize: typography.caption, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
   cardTitle: { marginTop: 4, color: colors.text, fontSize: 25, fontWeight: '900', letterSpacing: -0.7 },
   cardSubtitle: { marginTop: 2, color: colors.textMuted, fontSize: typography.caption, fontWeight: '600' },

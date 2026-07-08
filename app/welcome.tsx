@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     color: colors.text,
-    fontSize: typography.title,
+    fontSize: typography.sectionTitle,
     fontWeight: '900',
     letterSpacing: 12,
     marginLeft: 12,
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     marginTop: spacing.md,
     color: colors.textMuted,
-    fontSize: typography.subtitle,
+    fontSize: typography.cardTitle,
     fontWeight: '500',
     lineHeight: 26,
   },

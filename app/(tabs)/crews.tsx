@@ -33,19 +33,19 @@ const crews = [
 
 function useSlideUp(delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(18)).current;
+  const translateY = useRef(new Animated.Value(animations.entranceDistance)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: animations.slow,
+        duration: animations.entrance,
         delay,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
         toValue: 0,
-        duration: animations.slow,
+        duration: animations.entrance,
         delay,
         useNativeDriver: true,
       }),
@@ -191,14 +191,14 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.84,
-    transform: [{ scale: 0.98 }],
+    transform: [{ translateY: 1 }, { scale: 0.98 }],
   },
   featuredCard: {
     minHeight: 314,
     overflow: 'hidden',
     justifyContent: 'space-between',
     padding: spacing.xl,
-    borderRadius: radius.xl,
+    borderRadius: radius.card,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   featuredSubtitle: {
     color: colors.textMuted,
-    fontSize: typography.subtitle,
+    fontSize: typography.cardTitle,
     fontWeight: '700',
   },
   featuredStats: {
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.text,
-    fontSize: typography.title,
+    fontSize: typography.sectionTitle,
     fontWeight: '900',
     letterSpacing: -0.3,
   },
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   crewCard: {
     overflow: 'hidden',
     padding: spacing.lg,
-    borderRadius: radius.xl,
+    borderRadius: radius.card,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
   crewName: {
     color: colors.text,
-    fontSize: typography.subtitle,
+    fontSize: typography.cardTitle,
     fontWeight: '900',
     letterSpacing: -0.2,
   },

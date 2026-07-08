@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
   },
   padded: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.xl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
 });
