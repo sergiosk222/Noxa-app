@@ -3,29 +3,23 @@ import { useEffect, useRef } from 'react';
 import { Animated, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, type ImageStyle } from 'react-native';
 
 import { NoxaBadge, NoxaButton, NoxaCard, NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { featuredCar } from '@/src/data';
 import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
 const car = {
-  model: 'Nissan 370Z',
-  buildName: 'Street Hunter',
-  status: 'PUBLIC',
-  image:
-    'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?auto=format&fit=crop&w=1200&q=85',
+  model: featuredCar.name,
+  buildName: featuredCar.buildName,
+  status: featuredCar.visibility.toUpperCase(),
+  image: featuredCar.imageUrl,
   stats: [
-    { label: 'HP', value: '612' },
-    { label: 'Torque', value: '620 Nm' },
-    { label: '0-100', value: '3.6 s' },
-    { label: 'Stage', value: 'Stage 2' },
+    { label: 'HP', value: String(featuredCar.powerHp) },
+    { label: 'Torque', value: `${featuredCar.torqueNm} Nm` },
+    { label: '0-100', value: `${featuredCar.zeroToHundred} s` },
+    { label: 'Stage', value: featuredCar.stage },
   ],
-  buildCompletion: 78,
-  installedParts: ['Turbo Stage 2', 'Performance Exhaust', 'Coilovers', 'Cold Air Intake', 'Semi Slick Tires'],
-  gallery: [
-    'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=500&q=80',
-    'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=500&q=80',
-    'https://images.unsplash.com/photo-1542362567-b07e54358753?auto=format&fit=crop&w=500&q=80',
-    'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=500&q=80',
-    'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=500&q=80',
-  ],
+  buildCompletion: featuredCar.buildProgress,
+  installedParts: featuredCar.installedParts,
+  gallery: featuredCar.gallery,
   activity: {
     event: 'Night Run',
     date: 'Yesterday',

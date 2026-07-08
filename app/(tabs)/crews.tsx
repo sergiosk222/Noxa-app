@@ -3,33 +3,23 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { NoxaBadge, NoxaButton, NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { featuredCrew, mockCrews } from '@/src/data';
 import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
 const categories = ['Featured', 'Nearby', 'Invites', 'My Crews'] as const;
 
-const crews = [
-  {
-    name: 'Midnight Society',
-    area: 'Thessaloniki',
-    members: '24 members',
-    tag: 'STREET',
-    dots: ['#FF2D2D', '#FFFFFF', '#8E919A'],
-  },
-  {
-    name: 'Northline Club',
-    area: 'Kalamaria',
-    members: '16 members',
-    tag: 'CRUISE',
-    dots: ['#FFFFFF', '#8E919A', '#FF2D2D'],
-  },
-  {
-    name: 'Redline Garage',
-    area: 'Evosmos',
-    members: '31 members',
-    tag: 'BUILDS',
-    dots: ['#8E919A', '#FF2D2D', '#FFFFFF'],
-  },
+const crewDots = [
+  ['#FF2D2D', '#FFFFFF', '#8E919A'],
+  ['#FFFFFF', '#8E919A', '#FF2D2D'],
+  ['#8E919A', '#FF2D2D', '#FFFFFF'],
 ] as const;
+
+const crews = mockCrews.map((crew, index) => ({
+  ...crew,
+  area: crew.city,
+  members: `${crew.membersCount} members`,
+  dots: crewDots[index] ?? crewDots[0],
+}));
 
 function useSlideUp(delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -71,21 +61,21 @@ function FeaturedCrewCard() {
         <NoxaBadge label="FEATURED" variant="primary" />
         <View style={styles.memberPill}>
           <Ionicons name="people" size={15} color={colors.primary} />
-          <Text style={styles.memberPillText}>24 members</Text>
+          <Text style={styles.memberPillText}>{featuredCrew.membersCount} members</Text>
         </View>
       </View>
 
       <View style={styles.featuredCopy}>
-        <Text style={styles.featuredTitle}>Midnight Society</Text>
-        <Text style={styles.featuredSubtitle}>Thessaloniki Night Crew</Text>
+        <Text style={styles.featuredTitle}>{featuredCrew.name}</Text>
+        <Text style={styles.featuredSubtitle}>{featuredCrew.subtitle}</Text>
         <View style={styles.featuredStats}>
           <View style={styles.metaRow}>
             <Ionicons name="car-sport-outline" size={17} color={colors.textMuted} />
-            <Text style={styles.metaText}>18 cars</Text>
+            <Text style={styles.metaText}>{featuredCrew.carsCount} cars</Text>
           </View>
           <View style={styles.metaRow}>
             <Ionicons name="calendar-outline" size={17} color={colors.textMuted} />
-            <Text style={styles.metaText}>Night Run • Tonight</Text>
+            <Text style={styles.metaText}>{featuredCrew.nextEvent}</Text>
           </View>
         </View>
       </View>
@@ -155,7 +145,7 @@ export default function CrewsScreen() {
         <CategoryTabs />
         <View style={styles.listHeader}>
           <Text style={styles.sectionTitle}>Community core</Text>
-          <Text style={styles.sectionMeta}>3 crews</Text>
+          <Text style={styles.sectionMeta}>{crews.length} crews</Text>
         </View>
         {crews.map((crew, index) => (
           <CrewCard key={crew.name} crew={crew} index={index} />
