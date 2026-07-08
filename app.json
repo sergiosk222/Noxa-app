@@ -30,9 +30,6 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/references/noxa-splash-reference.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
           "backgroundColor": "#050608",
           "dark": {
             "backgroundColor": "#050608"
@@ -43,6 +40,9 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "splash": {
+      "backgroundColor": "#050608"
     }
   }
 }
