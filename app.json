@@ -30,12 +30,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/references/noxa-splash-reference.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#050608",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#050608"
           }
         }
       ]
