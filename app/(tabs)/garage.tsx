@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: 128,
+    paddingBottom: 144,
     gap: spacing.lg,
   },
   settings: {
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     transform: [{ translateY: 1 }, { scale: 0.98 }],
   },
   heroCard: {
-    height: 390,
+    height: 372,
     borderRadius: radius.card,
     overflow: 'hidden',
     backgroundColor: colors.surface,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   heroContent: {
     flex: 1,
     justifyContent: 'space-between',
-    padding: spacing.xl,
+    padding: spacing.lg,
   },
   model: {
     color: colors.text,
@@ -331,8 +331,8 @@ const styles = StyleSheet.create({
     paddingRight: spacing.lg,
   },
   galleryImage: {
-    width: 104,
-    height: 122,
+    width: 108,
+    height: 118,
     overflow: 'hidden',
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceSoft,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   },
   activityPanel: {
     marginTop: spacing.md,
-    padding: spacing.md,
+    padding: spacing.lg,
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceSoft,
     borderWidth: 1,

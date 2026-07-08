@@ -10,7 +10,7 @@ type NoxaAvatarProps = {
 export function NoxaAvatar({ initials = 'NX', size = 48 }: NoxaAvatarProps) {
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}> 
-      <Text style={styles.initials}>{initials.slice(0, 2).toUpperCase()}</Text>
+      <Text style={[styles.initials, { fontSize: Math.max(typography.caption, size * 0.32) }]}>{initials.slice(0, 2).toUpperCase()}</Text>
     </View>
   );
 }
@@ -25,7 +25,6 @@ const styles = StyleSheet.create({
   },
   initials: {
     color: colors.text,
-    fontSize: typography.caption,
     fontWeight: '900',
     letterSpacing: 0.6,
   },

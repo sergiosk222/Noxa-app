@@ -68,8 +68,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.xxl,
   },
   brandBlock: {
     alignItems: 'center',
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   heroCard: {
-    minHeight: 330,
+    minHeight: 320,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
@@ -115,10 +115,10 @@ const styles = StyleSheet.create({
   },
   headline: {
     color: colors.text,
-    fontSize: 46,
+    fontSize: 44,
     fontWeight: '900',
-    letterSpacing: -1.4,
-    lineHeight: 50,
+    letterSpacing: -1.2,
+    lineHeight: 48,
   },
   subtitle: {
     maxWidth: 280,
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.cardTitle,
     fontWeight: '500',
-    lineHeight: 26,
+    lineHeight: 25,
   },
   actions: {
     gap: spacing.md,

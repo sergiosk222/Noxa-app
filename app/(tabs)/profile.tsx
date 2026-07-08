@@ -91,7 +91,7 @@ function ProfileHero() {
   return (
     <Animated.View style={[styles.hero, { opacity, transform: [{ scale }] }]}>
       <View style={styles.avatarRing}>
-        <NoxaAvatar initials="SN" size={116} />
+        <NoxaAvatar initials="SN" size={108} />
       </View>
       <View style={styles.identityBlock}>
         <View style={styles.nameRow}>
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
-    paddingBottom: 128,
+    paddingBottom: 144,
     gap: spacing.lg,
   },
   iconButton: {
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'center',
-    padding: spacing.xxl,
+    padding: spacing.xl,
     borderRadius: radius.card,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -234,8 +234,8 @@ const styles = StyleSheet.create({
   },
   identityBlock: {
     alignItems: 'center',
-    marginTop: spacing.lg,
-    gap: spacing.xs,
+    marginTop: spacing.md,
+    gap: spacing.sm,
   },
   nameRow: {
     flexDirection: 'row',
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   statValue: {
-    minWidth: 118,
+    minWidth: 116,
     color: colors.text,
     fontSize: typography.h2,
     fontWeight: '900',
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: spacing.md,
-    padding: spacing.md,
+    padding: spacing.lg,
     borderRadius: radius.lg,
     backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   actionsList: {
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
   },
   actionRow: {
     minHeight: 58,
