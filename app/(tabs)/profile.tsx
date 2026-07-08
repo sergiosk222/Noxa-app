@@ -76,12 +76,12 @@ function ProfileHero() {
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: animations.entrance,
+        duration: 560,
         useNativeDriver: true,
       }),
       Animated.timing(scale, {
         toValue: 1,
-        duration: animations.entrance,
+        duration: 560,
         useNativeDriver: true,
       }),
     ]).start();

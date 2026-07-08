@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { NoxaBadge, NoxaButton, NoxaHeader, NoxaPressable, NoxaScreen } from '@/src/components/ui';
+import { NoxaBadge, NoxaButton, NoxaHeader, NoxaScreen } from '@/src/components/ui';
 import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
 const categories = ['Featured', 'Nearby', 'Invites', 'My Crews'] as const;
@@ -163,10 +163,10 @@ export default function CrewsScreen() {
       </ScrollView>
 
       <View style={styles.bottomAction} pointerEvents="box-none">
-        <NoxaPressable accessibilityLabel="Create Crew" accessibilityRole="button" style={styles.createButton}>
+        <Pressable accessibilityLabel="Create Crew" accessibilityRole="button" style={({ pressed }) => [styles.createButton, pressed && styles.pressed]}>
           <Ionicons name="add" size={22} color={colors.text} />
           <Text style={styles.createText}>Create Crew</Text>
-        </NoxaPressable>
+        </Pressable>
       </View>
     </NoxaScreen>
   );

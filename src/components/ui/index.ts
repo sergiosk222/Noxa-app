@@ -1,9 +1,7 @@
 export { NoxaAvatar } from './NoxaAvatar';
 export { NoxaBadge } from './NoxaBadge';
 export { NoxaButton } from './NoxaButton';
-export { NoxaAnimatedCard } from './NoxaAnimatedCard';
 export { NoxaCard } from './NoxaCard';
-export { NoxaPressable } from './NoxaPressable';
 export { NoxaFloatingActionButton } from './NoxaFloatingActionButton';
 export { NoxaHeader } from './NoxaHeader';
 export { NoxaInput } from './NoxaInput';
