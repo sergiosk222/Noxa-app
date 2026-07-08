@@ -1,19 +1,82 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef } from 'react';
-import { Animated, Easing, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { colors } from '@/src/theme/colors';
 import { radius } from '@/src/theme/radius';
 import { spacing } from '@/src/theme/spacing';
 import { typography } from '@/src/theme/typography';
 import { featuredEvent } from '@/src/data';
+import { shadows } from '@/src/theme/shadows';
 
-const vehicleMarkers = [
-  { id: 'r32', left: '18%', top: '26%', rotation: '-18deg' },
-  { id: 'supra', left: '70%', top: '22%', rotation: '24deg' },
-  { id: 'nsx', left: '58%', top: '55%', rotation: '-32deg' },
-  { id: 'rx7', left: '28%', top: '68%', rotation: '18deg' },
+const driverPreviews = [
+  {
+    id: 'r32',
+    left: '18%',
+    top: '26%',
+    rotation: '-18deg',
+    name: 'Kai Nakamura',
+    username: '@kai.r32',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80',
+    online: true,
+    distance: '1.2 km away',
+    vehicleImage: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=900&q=85',
+    carName: 'Nissan Skyline R32',
+    specs: ['420 HP', 'Manual', 'RWD'],
+    crew: 'Midnight Society',
+    stats: { reputation: '4.9', events: '28', cars: '3', followers: '12.4K' },
+  },
+  {
+    id: 'supra',
+    left: '70%',
+    top: '22%',
+    rotation: '24deg',
+    name: 'Mia Torres',
+    username: '@mialine',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80',
+    online: true,
+    distance: '2.8 km away',
+    vehicleImage: 'https://images.unsplash.com/photo-1617469767053-d3b523a0b982?auto=format&fit=crop&w=900&q=85',
+    carName: 'Toyota Supra A90',
+    specs: ['510 HP', 'Auto', 'RWD'],
+    crew: 'Redline Syndicate',
+    stats: { reputation: '4.8', events: '19', cars: '2', followers: '8.7K' },
+  },
+  {
+    id: 'nsx',
+    left: '58%',
+    top: '55%',
+    rotation: '-32deg',
+    name: 'Alex Voss',
+    username: '@voss.nsx',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=240&q=80',
+    online: false,
+    distance: '3.4 km away',
+    vehicleImage: 'https://images.unsplash.com/photo-1619767886558-efdc259cde1a?auto=format&fit=crop&w=900&q=85',
+    carName: 'Acura NSX',
+    specs: ['573 HP', 'DCT', 'AWD'],
+    crew: 'Carbon District',
+    stats: { reputation: '4.7', events: '14', cars: '5', followers: '6.1K' },
+  },
+  {
+    id: 'rx7',
+    left: '28%',
+    top: '68%',
+    rotation: '18deg',
+    name: 'Noah Cross',
+    username: '@rotarynoah',
+    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=240&q=80',
+    online: true,
+    distance: '900 m away',
+    vehicleImage: 'https://images.unsplash.com/photo-1603386329225-868f9b1ee6c9?auto=format&fit=crop&w=900&q=85',
+    carName: 'Mazda RX-7 FD',
+    specs: ['455 HP', 'Manual', 'RWD'],
+    crew: 'Midnight Society',
+    stats: { reputation: '5.0', events: '33', cars: '4', followers: '15.2K' },
+  },
 ] as const;
+
+type DriverPreview = (typeof driverPreviews)[number];
 
 const highways = [
   { id: 'harbor-loop', top: '34%', left: '-18%', width: '142%', rotation: '-22deg' },
@@ -85,7 +148,8 @@ function Road({ road, variant }: { road: (typeof highways)[number] | (typeof art
   );
 }
 
-function VehicleMarker({ left, top, rotation }: (typeof vehicleMarkers)[number]) {
+function VehicleMarker({ driver, onPress }: { driver: DriverPreview; onPress: (driver: DriverPreview) => void }) {
+  const { left, top, rotation } = driver;
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -98,7 +162,7 @@ function VehicleMarker({ left, top, rotation }: (typeof vehicleMarkers)[number])
   }, [pulse]);
 
   return (
-    <View style={[styles.vehicleMarker, { left, top, transform: [{ rotate: rotation }] }]}> 
+    <TouchableOpacity accessibilityLabel={`Open ${driver.name} preview`} activeOpacity={0.82} onPress={() => onPress(driver)} style={[styles.vehicleMarker, { left, top, transform: [{ rotate: rotation }] }]}> 
       <Animated.View
         style={[
           styles.vehicleGlow,
@@ -109,7 +173,7 @@ function VehicleMarker({ left, top, rotation }: (typeof vehicleMarkers)[number])
         ]}
       />
       <Ionicons name="navigate" size={13} color={colors.text} />
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -185,7 +249,7 @@ function EventCard() {
   );
 }
 
-function FakeLiveMap() {
+function FakeLiveMap({ onDriverPress }: { onDriverPress: (driver: DriverPreview) => void }) {
   return (
     <View style={styles.mapPanel}>
       <View style={styles.cityGlow} />
@@ -210,7 +274,7 @@ function FakeLiveMap() {
       {intersections.map((point) => <View key={point.id} style={[styles.intersection, { left: point.left, top: point.top, width: point.size, height: point.size }]} />)}
 
       {ambientParticles.map((particle) => <View key={particle.id} style={[styles.ambientParticle, { left: particle.left, top: particle.top, opacity: particle.opacity }]} />)}
-      {vehicleMarkers.map((marker) => <VehicleMarker key={marker.id} {...marker} />)}
+      {driverPreviews.map((driver) => <VehicleMarker key={driver.id} driver={driver} onPress={onDriverPress} />)}
       <CrewMarker />
       <EventMarker />
       <View style={styles.mapVignetteTop} />
@@ -219,7 +283,111 @@ function FakeLiveMap() {
   );
 }
 
+
+const quickStats = [
+  { key: 'reputation', icon: '⭐', label: 'Reputation' },
+  { key: 'events', icon: '🏁', label: 'Events' },
+  { key: 'cars', icon: '🚘', label: 'Cars' },
+  { key: 'followers', icon: '👥', label: 'Followers' },
+] as const;
+
+function DriverPreviewCard({ driver, onClose }: { driver: DriverPreview; onClose: () => void }) {
+  const translateY = useRef(new Animated.Value(430)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, damping: 21, stiffness: 185, mass: 0.85, useNativeDriver: true }),
+    ]).start();
+  }, [overlayOpacity, translateY]);
+
+  const closeWithAnimation = () => {
+    Animated.parallel([
+      Animated.timing(overlayOpacity, { toValue: 0, duration: 260, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 430, duration: 320, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+    ]).start(onClose);
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderMove: (_, gesture) => translateY.setValue(Math.max(0, gesture.dy)),
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 86 || gesture.vy > 0.9) {
+          closeWithAnimation();
+          return;
+        }
+
+        Animated.spring(translateY, { toValue: 0, damping: 20, stiffness: 180, useNativeDriver: true }).start();
+      },
+    }),
+  ).current;
+
+  return (
+    <View style={styles.previewLayer} pointerEvents="box-none">
+      <Pressable accessibilityLabel="Close driver preview" onPress={closeWithAnimation} style={StyleSheet.absoluteFill}>
+        <Animated.View style={[styles.previewScrim, { opacity: overlayOpacity }]} />
+      </Pressable>
+      <Animated.View style={[styles.driverCard, { transform: [{ translateY }] }]} {...panResponder.panHandlers}>
+        <View style={styles.dragHandle} />
+        <View style={styles.driverHeader}>
+          <Image source={{ uri: driver.avatar }} style={styles.driverAvatar} />
+          <View style={styles.driverIdentity}>
+            <View style={styles.nameRow}>
+              <Text style={styles.driverName}>{driver.name}</Text>
+              {driver.online ? <Text style={styles.onlineBadge}>ONLINE</Text> : null}
+            </View>
+            <Text style={styles.driverUsername}>{driver.username}</Text>
+            <Text style={styles.driverDistance}>{driver.distance}</Text>
+          </View>
+        </View>
+
+        <View style={styles.vehicleSection}>
+          <Image source={{ uri: driver.vehicleImage }} style={styles.vehicleImage} />
+          <View style={styles.vehicleGradient} />
+          <View style={styles.vehicleCopy}>
+            <Text style={styles.vehicleName}>{driver.carName}</Text>
+            <View style={styles.specRow}>
+              {driver.specs.map((spec) => (
+                <Text key={spec} style={styles.specPill}>{spec}</Text>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity activeOpacity={0.82} style={styles.crewBadge}>
+          <Ionicons name="shield-checkmark" size={15} color={colors.accent} />
+          <Text style={styles.crewText}>{driver.crew}</Text>
+          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        <View style={styles.statsGrid}>
+          {quickStats.map((stat) => (
+            <View key={stat.key} style={styles.statTile}>
+              <Text style={styles.statIcon}>{stat.icon}</Text>
+              <Text style={styles.statValue}>{driver.stats[stat.key]}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity activeOpacity={0.86} style={styles.profileButton}>
+            <Text style={styles.profileButtonText}>View Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.82} style={styles.messageButton}>
+            <Text style={styles.messageButtonText}>Message</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 export default function LiveMapScreen() {
+  const [selectedDriver, setSelectedDriver] = useState<DriverPreview | null>(null);
+
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
@@ -237,9 +405,10 @@ export default function LiveMapScreen() {
       </View>
 
       <View style={styles.content}>
-        <FakeLiveMap />
+        <FakeLiveMap onDriverPress={setSelectedDriver} />
         <EventCard />
       </View>
+      {selectedDriver ? <DriverPreviewCard driver={selectedDriver} onClose={() => setSelectedDriver(null)} /> : null}
     </SafeAreaView>
   );
 }
@@ -363,4 +532,48 @@ const styles = StyleSheet.create({
   cardSubtitle: { marginTop: 2, color: colors.textMuted, fontSize: typography.caption, fontWeight: '600' },
   eventButton: { marginTop: spacing.sm, height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,36,36,0.44)', backgroundColor: '#D71920', shadowColor: colors.accent, shadowOpacity: 0.34, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
   eventButtonText: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
+  previewLayer: { ...StyleSheet.absoluteFillObject, zIndex: 30, justifyContent: 'flex-end' },
+  previewScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.46)' },
+  driverCard: {
+    marginHorizontal: spacing.md,
+    marginBottom: 96,
+    padding: spacing.lg,
+    borderRadius: 34,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(14,16,22,0.96)',
+    ...shadows.card,
+    shadowOpacity: 0.66,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 24 },
+    elevation: 24,
+  },
+  dragHandle: { alignSelf: 'center', width: 48, height: 5, marginBottom: spacing.md, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.24)' },
+  driverHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  driverAvatar: { width: 82, height: 82, borderRadius: radius.pill, borderWidth: 2, borderColor: 'rgba(255,255,255,0.84)', backgroundColor: colors.surfaceSoft },
+  driverIdentity: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.xs },
+  driverName: { color: colors.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  onlineBadge: { overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill, color: '#06120A', backgroundColor: colors.success, fontSize: 10, fontWeight: '900', letterSpacing: 0.9 },
+  driverUsername: { marginTop: 2, color: colors.textMuted, fontSize: typography.body, fontWeight: '700' },
+  driverDistance: { marginTop: 7, color: colors.text, fontSize: typography.caption, fontWeight: '800' },
+  vehicleSection: { marginTop: spacing.lg, height: 152, overflow: 'hidden', borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)', backgroundColor: '#080A0E' },
+  vehicleImage: { width: '100%', height: '100%' },
+  vehicleGradient: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.22)' },
+  vehicleCopy: { position: 'absolute', left: spacing.md, right: spacing.md, bottom: spacing.md },
+  vehicleName: { color: colors.text, fontSize: 21, fontWeight: '900', letterSpacing: -0.4, textShadowColor: 'rgba(0,0,0,0.55)', textShadowRadius: 10, textShadowOffset: { width: 0, height: 3 } },
+  specRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
+  specPill: { overflow: 'hidden', paddingHorizontal: spacing.sm, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', color: colors.text, backgroundColor: 'rgba(8,10,14,0.72)', fontSize: 11, fontWeight: '900' },
+  crewBadge: { marginTop: spacing.md, height: 42, flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.13)', backgroundColor: 'rgba(255,255,255,0.07)' },
+  crewText: { color: colors.text, fontSize: typography.caption, fontWeight: '900' },
+  statsGrid: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.md },
+  statTile: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)', backgroundColor: 'rgba(255,255,255,0.055)' },
+  statIcon: { fontSize: 16 },
+  statValue: { marginTop: 3, color: colors.text, fontSize: typography.body, fontWeight: '900' },
+  statLabel: { marginTop: 2, color: colors.textMuted, fontSize: 9, fontWeight: '800' },
+  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  profileButton: { flex: 1.35, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.accentDark, borderWidth: 1, borderColor: 'rgba(255,80,80,0.62)', shadowColor: colors.accent, shadowOpacity: 0.46, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
+  profileButtonText: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
+  messageButton: { flex: 1, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.08)' },
+  messageButtonText: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
 });
