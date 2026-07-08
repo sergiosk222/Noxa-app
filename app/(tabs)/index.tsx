@@ -6,6 +6,7 @@ import { colors } from '@/src/theme/colors';
 import { radius } from '@/src/theme/radius';
 import { spacing } from '@/src/theme/spacing';
 import { typography } from '@/src/theme/typography';
+import { featuredEvent } from '@/src/data';
 
 const vehicleMarkers = [
   { id: 'r32', left: '18%', top: '26%', rotation: '-18deg' },
@@ -173,8 +174,8 @@ function EventCard() {
       ]}>
       <View>
         <Text style={styles.cardKicker}>Featured live event</Text>
-        <Text style={styles.cardTitle}>Night Run</Text>
-        <Text style={styles.cardSubtitle}>22 participants • Starts in 18 min</Text>
+        <Text style={styles.cardTitle}>{featuredEvent.title}</Text>
+        <Text style={styles.cardSubtitle}>{featuredEvent.participantsCount} participants • Starts in 18 min</Text>
       </View>
       <TouchableOpacity activeOpacity={0.82} style={styles.eventButton}>
         <Text style={styles.eventButtonText}>View Event</Text>

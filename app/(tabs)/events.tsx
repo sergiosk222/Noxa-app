@@ -3,33 +3,18 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { NoxaBadge, NoxaButton, NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { featuredEvent, mockEvents } from '@/src/data';
 import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
 const categories = ['Tonight', 'Nearby', 'Crews', 'Weekend'] as const;
 
-const events = [
-  {
-    title: 'Cars & Coffee',
-    time: 'Sunday • 10:00',
-    participants: '18 going',
-    tag: 'SOCIAL',
-    location: 'Old Port Garage',
-  },
-  {
-    title: 'Drift Practice',
-    time: 'Friday • 21:00',
-    participants: '12 going',
-    tag: 'TRACK',
-    location: 'Private Circuit Pad',
-  },
-  {
-    title: 'Sunset Cruise',
-    time: 'Saturday • 19:30',
-    participants: '34 going',
-    tag: 'CRUISE',
-    location: 'Thermaikos Lookout',
-  },
-] as const;
+const events = mockEvents
+  .filter((event) => !event.isFeatured)
+  .map((event) => ({
+    ...event,
+    time: event.timeLabel,
+    participants: `${event.participantsCount} going`,
+  }));
 
 function useSlideUp(delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -71,19 +56,19 @@ function FeaturedEventCard() {
         <NoxaBadge label="FEATURED" variant="primary" />
         <View style={styles.goingPill}>
           <Ionicons name="people" size={15} color={colors.primary} />
-          <Text style={styles.goingText}>22 going</Text>
+          <Text style={styles.goingText}>{featuredEvent.participantsCount} going</Text>
         </View>
       </View>
 
       <View style={styles.featuredCopy}>
-        <Text style={styles.featuredTitle}>Night Run</Text>
+        <Text style={styles.featuredTitle}>{featuredEvent.title}</Text>
         <View style={styles.metaRow}>
           <Ionicons name="location-outline" size={17} color={colors.textMuted} />
-          <Text style={styles.metaText}>Thessaloniki Waterfront</Text>
+          <Text style={styles.metaText}>{featuredEvent.location}</Text>
         </View>
         <View style={styles.metaRow}>
           <Ionicons name="time-outline" size={17} color={colors.textMuted} />
-          <Text style={styles.metaText}>Tonight • 22:30</Text>
+          <Text style={styles.metaText}>{featuredEvent.timeLabel}</Text>
         </View>
       </View>
 
@@ -139,7 +124,7 @@ export default function EventsScreen() {
         <CategoryTabs />
         <View style={styles.listHeader}>
           <Text style={styles.sectionTitle}>Local heartbeat</Text>
-          <Text style={styles.sectionMeta}>3 events</Text>
+          <Text style={styles.sectionMeta}>{events.length} events</Text>
         </View>
         {events.map((event, index) => (
           <EventCard key={event.title} event={event} index={index} />

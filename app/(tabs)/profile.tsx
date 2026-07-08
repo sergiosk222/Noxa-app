@@ -3,20 +3,21 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { NoxaAvatar, NoxaBadge, NoxaButton, NoxaCard, NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { currentUser } from '@/src/data';
 import { animations, colors, radius, spacing, typography } from '@/src/theme';
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
 const profile = {
-  name: 'Sergey',
-  username: '@noxa',
-  status: 'ONLINE',
-  location: 'Thessaloniki',
+  name: currentUser.name,
+  username: currentUser.username,
+  status: currentUser.status.toUpperCase(),
+  location: currentUser.city,
   stats: [
-    { label: 'Cars', value: '2' },
-    { label: 'Crews', value: '1' },
-    { label: 'Events', value: '24' },
-    { label: 'Followers', value: '148' },
+    { label: 'Cars', value: String(currentUser.carsCount) },
+    { label: 'Crews', value: String(currentUser.crewsCount) },
+    { label: 'Events', value: String(currentUser.eventsCount) },
+    { label: 'Followers', value: String(currentUser.followersCount) },
   ],
   achievements: ['Night Driver', 'Crew Leader', 'Early Member'],
   activity: {
