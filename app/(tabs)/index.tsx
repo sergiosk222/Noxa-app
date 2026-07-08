@@ -71,7 +71,6 @@ type ActionButtonProps = {
 function HeaderAction({ icon, accessibilityLabel }: ActionButtonProps) {
   return (
     <TouchableOpacity accessibilityLabel={accessibilityLabel} activeOpacity={0.78} style={styles.headerAction}>
-      <View style={styles.glassReflection} />
       <Ionicons name={icon} size={20} color={colors.text} />
     </TouchableOpacity>
   );
@@ -172,15 +171,12 @@ function EventCard() {
           transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
         },
       ]}>
-      <View style={styles.cardSheen} />
       <View>
         <Text style={styles.cardKicker}>Featured live event</Text>
         <Text style={styles.cardTitle}>Night Run</Text>
         <Text style={styles.cardSubtitle}>22 participants • Starts in 18 min</Text>
       </View>
       <TouchableOpacity activeOpacity={0.82} style={styles.eventButton}>
-        <View style={styles.buttonGlow} />
-        <View style={styles.buttonHighlight} />
         <Text style={styles.eventButtonText}>View Event</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.text} />
       </TouchableOpacity>
@@ -227,7 +223,6 @@ export default function LiveMapScreen() {
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          <View style={styles.glassReflection} />
           <Text style={styles.avatarText}>N</Text>
         </View>
         <View style={styles.logoWrap}>
@@ -235,8 +230,8 @@ export default function LiveMapScreen() {
           <Text style={styles.logo}>NOXA</Text>
         </View>
         <View style={styles.headerActions}>
-          <HeaderAction icon="search" accessibilityLabel="Search" />
-          <HeaderAction icon="notifications" accessibilityLabel="Notifications" />
+          <HeaderAction icon="search-outline" accessibilityLabel="Search" />
+          <HeaderAction icon="notifications-outline" accessibilityLabel="Notifications" />
         </View>
       </View>
 
@@ -257,8 +252,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
-    backgroundColor: 'rgba(8,10,15,0.80)',
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#080A0E',
     shadowColor: '#000',
     shadowOpacity: 0.32,
     shadowRadius: 18,
@@ -267,26 +262,16 @@ const styles = StyleSheet.create({
   avatar: {
     width: 38,
     height: 38,
-    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
-    backgroundColor: 'rgba(255,255,255,0.075)',
-    shadowColor: colors.accent,
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  glassReflection: {
-    position: 'absolute',
-    top: 2,
-    left: 6,
-    right: 6,
-    height: 13,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: '#141821',
+    shadowColor: '#000',
+    shadowOpacity: 0.34,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
   },
   avatarText: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
   logoWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' },
@@ -308,17 +293,16 @@ const styles = StyleSheet.create({
   headerAction: {
     width: 38,
     height: 38,
-    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(255,255,255,0.13)',
+    backgroundColor: '#131720',
     shadowColor: '#000',
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
   },
   content: { flex: 1, paddingHorizontal: spacing.md, paddingBottom: 104 },
   mapPanel: {
@@ -334,22 +318,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 24 },
     elevation: 16,
   },
-  cityGlow: { position: 'absolute', top: '22%', left: '18%', width: 260, height: 260, borderRadius: 150, backgroundColor: 'rgba(255,36,36,0.075)' },
+  cityGlow: { position: 'absolute', top: '22%', left: '18%', width: 260, height: 260, borderRadius: 150, backgroundColor: 'rgba(115,126,145,0.06)' },
   cornerShadeLeft: { position: 'absolute', left: -70, bottom: -70, width: 190, height: 230, borderRadius: 90, backgroundColor: 'rgba(0,0,0,0.48)' },
   cornerShadeRight: { position: 'absolute', right: -80, top: -60, width: 210, height: 230, borderRadius: 105, backgroundColor: 'rgba(0,0,0,0.42)' },
   mapFogOne: { position: 'absolute', top: '8%', left: '-10%', width: '78%', height: 130, borderRadius: 80, backgroundColor: 'rgba(120,135,160,0.055)', transform: [{ rotate: '-10deg' }] },
   mapFogTwo: { position: 'absolute', bottom: '18%', right: '-8%', width: '82%', height: 150, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.035)', transform: [{ rotate: '16deg' }] },
   road: { position: 'absolute', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, shadowColor: '#000', shadowOpacity: 0.34, shadowRadius: 10, shadowOffset: { width: 0, height: 7 } },
-  highway: { height: 34, backgroundColor: 'rgba(44,49,61,0.92)', borderColor: 'rgba(255,255,255,0.08)' },
-  arterial: { height: 22, backgroundColor: 'rgba(34,39,50,0.86)', borderColor: 'rgba(255,255,255,0.06)' },
-  street: { height: 12, backgroundColor: 'rgba(28,33,43,0.68)', borderColor: 'rgba(255,255,255,0.035)' },
+  highway: { height: 34, backgroundColor: 'rgba(47,52,63,0.94)', borderColor: 'rgba(255,255,255,0.075)' },
+  arterial: { height: 22, backgroundColor: 'rgba(35,40,49,0.88)', borderColor: 'rgba(255,255,255,0.055)' },
+  street: { height: 12, backgroundColor: 'rgba(27,32,40,0.72)', borderColor: 'rgba(255,255,255,0.035)' },
   roadCenter: { alignSelf: 'stretch', marginHorizontal: spacing.lg, borderRadius: radius.pill },
-  highwayCenter: { height: 2, backgroundColor: 'rgba(255,36,36,0.26)' },
+  highwayCenter: { height: 2, backgroundColor: 'rgba(220,226,235,0.15)' },
   arterialCenter: { height: 1, backgroundColor: 'rgba(255,255,255,0.12)' },
   streetCenter: { height: 1, backgroundColor: 'rgba(255,255,255,0.055)' },
   intersection: { position: 'absolute', borderRadius: radius.pill, backgroundColor: 'rgba(235,239,245,0.18)', shadowColor: colors.accent, shadowOpacity: 0.22, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } },
   districtBlockOne: { position: 'absolute', left: '7%', top: '10%', width: 120, height: 94, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.032)', transform: [{ rotate: '-16deg' }] },
-  districtBlockTwo: { position: 'absolute', right: '7%', top: '34%', width: 142, height: 106, borderRadius: 34, backgroundColor: 'rgba(255,36,36,0.038)', transform: [{ rotate: '18deg' }] },
+  districtBlockTwo: { position: 'absolute', right: '7%', top: '34%', width: 142, height: 106, borderRadius: 34, backgroundColor: 'rgba(255,255,255,0.03)', transform: [{ rotate: '18deg' }] },
   districtBlockThree: { position: 'absolute', left: '19%', bottom: '12%', width: 152, height: 110, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.028)', transform: [{ rotate: '11deg' }] },
   districtBlockFour: { position: 'absolute', right: '16%', bottom: '5%', width: 104, height: 138, borderRadius: 28, backgroundColor: 'rgba(70,82,105,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.035)', transform: [{ rotate: '-22deg' }] },
   districtBlockFive: { position: 'absolute', left: '42%', top: '6%', width: 84, height: 150, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.022)', transform: [{ rotate: '29deg' }] },
@@ -358,7 +342,7 @@ const styles = StyleSheet.create({
   parkingStripe: { position: 'absolute', top: 14, left: 10, right: 10, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' },
   parkingStripeOffset: { top: 30 },
   ambientParticle: { position: 'absolute', width: 3, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.85)' },
-  mapVignetteTop: { position: 'absolute', top: -110, left: -70, right: -70, height: 240, borderRadius: 130, backgroundColor: 'rgba(255,36,36,0.055)' },
+  mapVignetteTop: { position: 'absolute', top: -110, left: -70, right: -70, height: 240, borderRadius: 130, backgroundColor: 'rgba(70,82,105,0.08)' },
   mapVignetteBottom: { position: 'absolute', bottom: -130, left: -40, right: -90, height: 280, borderRadius: 150, backgroundColor: 'rgba(0,0,0,0.54)' },
   vehicleMarker: { position: 'absolute', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.46)', backgroundColor: 'rgba(255,36,36,0.96)', shadowColor: colors.accent, shadowOpacity: 0.8, shadowRadius: 14, shadowOffset: { width: 0, height: 0 }, elevation: 10 },
   vehicleGlow: { position: 'absolute', width: 44, height: 44, borderRadius: radius.pill, backgroundColor: 'rgba(255,36,36,0.22)' },
@@ -372,13 +356,10 @@ const styles = StyleSheet.create({
   eventCore: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 2, borderColor: 'rgba(255,255,255,0.72)', backgroundColor: colors.accentDark, shadowColor: colors.accent, shadowOpacity: 0.9, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 14 },
   eventLabel: { marginTop: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.pill, backgroundColor: 'rgba(5,6,8,0.82)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' },
   eventLabelText: { color: colors.text, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
-  eventCard: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 128, overflow: 'hidden', padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', backgroundColor: 'rgba(18,21,29,0.82)', shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 28, shadowOffset: { width: 0, height: 20 }, elevation: 20 },
-  cardSheen: { position: 'absolute', top: 1, left: 16, right: 16, height: 1, backgroundColor: 'rgba(255,255,255,0.24)' },
-  cardKicker: { color: colors.accent, fontSize: typography.caption, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase' },
+  eventCard: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 128, padding: spacing.md, borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', backgroundColor: '#11141B', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 18 }, elevation: 18 },
+  cardKicker: { color: colors.accent, fontSize: typography.caption, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
   cardTitle: { marginTop: 4, color: colors.text, fontSize: 25, fontWeight: '900', letterSpacing: -0.7 },
   cardSubtitle: { marginTop: 2, color: colors.textMuted, fontSize: typography.caption, fontWeight: '600' },
-  eventButton: { marginTop: spacing.sm, height: 42, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.30)', backgroundColor: colors.accentDark, shadowColor: colors.accent, shadowOpacity: 0.5, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
-  buttonGlow: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(255,36,36,0.82)' },
-  buttonHighlight: { position: 'absolute', left: 28, right: 28, top: 4, height: 10, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.16)' },
-  eventButtonText: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
+  eventButton: { marginTop: spacing.sm, height: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,36,36,0.44)', backgroundColor: '#D71920', shadowColor: colors.accent, shadowOpacity: 0.34, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
+  eventButtonText: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
 });
