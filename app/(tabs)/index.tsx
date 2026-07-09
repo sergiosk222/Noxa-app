@@ -407,7 +407,7 @@ export default function LiveMapScreen() {
           <Text style={styles.logo}>NOXA</Text>
         </View>
         <View style={styles.headerActions}>
-          <HeaderAction icon="search-outline" accessibilityLabel="Search" />
+          <HeaderAction icon="search-outline" accessibilityLabel="Search" onPress={() => router.push('/search')} />
           <HeaderAction icon="notifications-outline" accessibilityLabel="Notifications" onPress={() => router.push('/notifications')} />
         </View>
       </View>
