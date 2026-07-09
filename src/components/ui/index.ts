@@ -11,3 +11,5 @@ export { NoxaSectionTitle } from './NoxaSectionTitle';
 export { NoxaDivider } from './NoxaDivider';
 export { NoxaEmptyState } from './NoxaEmptyState';
 export { NoxaIconButton } from './NoxaIconButton';
+export { NoxaPressable } from './NoxaPressable';
+export { NoxaAnimatedCard } from './NoxaAnimatedCard';
