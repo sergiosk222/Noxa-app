@@ -1,29 +1,44 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { colors } from '@/src/theme/colors';
 import { radius } from '@/src/theme/radius';
 import { spacing } from '@/src/theme/spacing';
+import { animations } from '@/src/theme/animations';
+import { NoxaPressable } from '@/src/components/ui';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 function TabIcon({ name, color, focused }: { name: IconName; color: string; focused: boolean }) {
+  const activeStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: withTiming(focused ? 1.06 : 1, { duration: animations.base }) }],
+  }));
+
   return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+    <Animated.View style={[styles.iconWrap, focused && styles.iconWrapActive, activeStyle]}>
       <Ionicons name={name} size={22} color={color} />
       {focused ? <View style={styles.activeIndicator} /> : null}
-    </View>
+    </Animated.View>
   );
 }
 
 function MapIcon({ color, focused }: { color: string; focused: boolean }) {
+  const activeStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: withTiming(focused ? 1.05 : 1, { duration: animations.base }) }],
+  }));
+
   return (
-    <View style={[styles.mapIcon, focused && styles.mapIconActive]}>
+    <Animated.View style={[styles.mapIcon, focused && styles.mapIconActive, activeStyle]}>
       <Ionicons name="map" size={26} color={color} />
       {focused ? <View style={styles.mapActiveIndicator} /> : null}
-    </View>
+    </Animated.View>
   );
+}
+
+function TabBarButton(props: React.ComponentProps<typeof NoxaPressable>) {
+  return <NoxaPressable {...props} pressedScale={0.96} pressedOpacity={0.92} />;
 }
 
 export default function TabLayout() {
@@ -36,6 +51,7 @@ export default function TabLayout() {
         tabBarLabelStyle: styles.label,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabItem,
+        tabBarButton: (props) => <TabBarButton {...props} />,
       }}>
       <Tabs.Screen
         name="crews"

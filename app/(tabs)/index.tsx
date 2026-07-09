@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, PanResponder, Pressable, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Reanimated, { Easing as ReanimatedEasing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { colors } from '@/src/theme/colors';
 import { radius } from '@/src/theme/radius';
@@ -152,28 +153,20 @@ function Road({ road, variant }: { road: (typeof highways)[number] | (typeof art
 
 function VehicleMarker({ driver, onPress }: { driver: DriverPreview; onPress: (driver: DriverPreview) => void }) {
   const { left, top, rotation } = driver;
-  const pulse = useRef(new Animated.Value(0)).current;
+  const pulse = useSharedValue(0);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1800, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      ]),
-    ).start();
+    pulse.value = withRepeat(withTiming(1, { duration: 2200, easing: ReanimatedEasing.out(ReanimatedEasing.quad) }), -1, true);
   }, [pulse]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.26 + pulse.value * 0.24,
+    transform: [{ scale: 0.92 + pulse.value * 0.16 }],
+  }));
 
   return (
     <TouchableOpacity accessibilityLabel={`Open ${driver.name} preview`} activeOpacity={0.82} onPress={() => onPress(driver)} style={[styles.vehicleMarker, { left, top, transform: [{ rotate: rotation }] }]}> 
-      <Animated.View
-        style={[
-          styles.vehicleGlow,
-          {
-            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.62] }),
-            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1.2] }) }],
-          },
-        ]}
-      />
+      <Reanimated.View style={[styles.vehicleGlow, pulseStyle]} />
       <Ionicons name="navigate" size={13} color={colors.text} />
     </TouchableOpacity>
   );
@@ -192,25 +185,20 @@ function CrewMarker() {
 }
 
 function EventMarker() {
-  const pulse = useRef(new Animated.Value(0)).current;
+  const pulse = useSharedValue(0);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.timing(pulse, { toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-    ).start();
+    pulse.value = withRepeat(withTiming(1, { duration: 2400, easing: ReanimatedEasing.out(ReanimatedEasing.quad) }), -1, false);
   }, [pulse]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: 0.34 * (1 - pulse.value),
+    transform: [{ scale: 0.86 + pulse.value * 0.32 }],
+  }));
 
   return (
     <View style={styles.eventMarker}>
-      <Animated.View
-        style={[
-          styles.eventPulse,
-          {
-            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
-            transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1.34] }) }],
-          },
-        ]}
-      />
+      <Reanimated.View style={[styles.eventPulse, pulseStyle]} />
       <View style={styles.eventRing} />
       <View style={styles.eventCore}>
         <Ionicons name="flag" size={18} color={colors.text} />
@@ -301,7 +289,7 @@ function DriverPreviewCard({ driver, onClose, onViewProfile }: { driver: DriverP
   useEffect(() => {
     Animated.parallel([
       Animated.timing(overlayOpacity, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.spring(translateY, { toValue: 0, damping: 21, stiffness: 185, mass: 0.85, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
   }, [overlayOpacity, translateY]);
 
@@ -322,7 +310,7 @@ function DriverPreviewCard({ driver, onClose, onViewProfile }: { driver: DriverP
           return;
         }
 
-        Animated.spring(translateY, { toValue: 0, damping: 20, stiffness: 180, useNativeDriver: true }).start();
+        Animated.timing(translateY, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
       },
     }),
   ).current;

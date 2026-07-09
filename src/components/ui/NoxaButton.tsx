@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
-import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
+import { colors, radius, shadows, spacing, typography } from '@/src/theme';
+import { NoxaPressable } from './NoxaPressable';
 
 type NoxaButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -17,7 +18,7 @@ export function NoxaButton({ title, onPress, variant = 'primary', disabled = fal
   const isDisabled = disabled || loading;
 
   return (
-    <Pressable
+    <NoxaPressable
       accessibilityRole="button"
       disabled={isDisabled}
       onPress={onPress}
@@ -25,11 +26,10 @@ export function NoxaButton({ title, onPress, variant = 'primary', disabled = fal
         styles.base,
         styles[variant],
         fullWidth && styles.fullWidth,
-        pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
       ]}>
       <Text style={[styles.text, styles[`${variant}Text`], isDisabled && styles.disabledText]}>{loading ? 'Loading…' : title}</Text>
-    </Pressable>
+    </NoxaPressable>
   );
 }
 
@@ -48,7 +48,6 @@ const styles = StyleSheet.create({
   secondary: { backgroundColor: colors.surfaceSoft, borderColor: colors.border },
   ghost: { backgroundColor: 'transparent', borderColor: 'transparent' },
   danger: { backgroundColor: colors.accentDark, borderColor: colors.borderAccent },
-  pressed: { opacity: 0.9, transform: [{ translateY: 1 }, { scale: animations.pressedScale }] },
   disabled: { opacity: 0.45 },
   text: {
     fontSize: typography.body,
