@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -9,10 +9,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { colors } from '@/src/theme/colors';
-import { radius } from '@/src/theme/radius';
-import { spacing } from '@/src/theme/spacing';
-import { typography } from '@/src/theme/typography';
+import { NoxaBrandLockup, NoxaWordmark } from '@/src/components/brand';
+import { colors, radius, spacing } from '@/src/theme';
 
 const SPLASH_COMPLETE_MS = 2100;
 
@@ -87,13 +85,15 @@ export default function SplashScreen() {
     <View style={styles.screen}>
       <View style={styles.centerStage}>
         <Animated.View style={[styles.redLightLine, glowStyle]} />
-        <Animated.View accessibilityLabel="Noxa logo mark" style={[styles.logoMark, logoStyle]}>
-          <Text style={styles.logoLetter}>N</Text>
-          <View style={styles.logoRedBlade} />
-          <View style={styles.logoEdgeLight} />
+        <Animated.View style={[styles.brandLockup, logoStyle]}>
+          <NoxaBrandLockup size={156} showWordmark={false} showSlogan={false} />
         </Animated.View>
-        <Animated.Text style={[styles.wordmark, wordmarkStyle]}>NOXA</Animated.Text>
-        <Animated.Text style={[styles.slogan, sloganStyle]}>OWN THE NIGHT</Animated.Text>
+        <Animated.View style={[styles.wordmarkLockup, wordmarkStyle]}>
+          <NoxaWordmark size={42} showSlogan={false} />
+        </Animated.View>
+        <Animated.View style={sloganStyle}>
+          <NoxaWordmark size={42} showWordmark={false} showSlogan compact />
+        </Animated.View>
       </View>
     </View>
   );
@@ -123,60 +123,11 @@ const styles = StyleSheet.create({
     shadowRadius: 36,
     shadowOffset: { width: 0, height: 0 },
   },
-  logoMark: {
-    width: 132,
-    height: 132,
+  brandLockup: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoLetter: {
-    color: '#F8F8FA',
-    fontSize: 110,
-    fontWeight: '900',
-    letterSpacing: -10,
-    lineHeight: 124,
-    textShadowColor: 'rgba(255,255,255,0.18)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 16,
-  },
-  logoRedBlade: {
-    position: 'absolute',
-    right: 34,
-    top: 23,
-    width: 7,
-    height: 86,
-    borderRadius: radius.pill,
-    backgroundColor: colors.accentDark,
-    transform: [{ rotate: '22deg' }],
-    shadowColor: colors.accent,
-    shadowOpacity: 0.76,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  logoEdgeLight: {
-    position: 'absolute',
-    top: 33,
-    width: 56,
-    height: 1,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.34)',
-    transform: [{ rotate: '-25deg' }, { translateX: -11 }],
-  },
-  wordmark: {
-    marginTop: spacing.md,
-    color: colors.text,
-    fontSize: typography.hero,
-    fontWeight: '800',
-    letterSpacing: 13,
-  },
-  slogan: {
+  wordmarkLockup: {
     marginTop: spacing.sm,
-    color: colors.accent,
-    fontSize: typography.caption,
-    fontWeight: '800',
-    letterSpacing: 5,
-    textShadowColor: 'rgba(255,36,36,0.28)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 14,
   },
 });
