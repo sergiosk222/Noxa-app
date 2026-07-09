@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -49,6 +50,8 @@ function IconButton() {
 }
 
 function FeaturedEventCard() {
+  const router = useRouter();
+
   return (
     <Animated.View style={[styles.featuredCard, useSlideUp(80)]}>
       <View style={styles.featuredGlow} />
@@ -72,7 +75,7 @@ function FeaturedEventCard() {
         </View>
       </View>
 
-      <NoxaButton title="View Event" fullWidth />
+      <NoxaButton title="View Event" fullWidth onPress={() => router.push('/event-details')} />
     </Animated.View>
   );
 }
@@ -90,27 +93,35 @@ function CategoryTabs() {
 }
 
 function EventCard({ event, index }: { event: (typeof events)[number]; index: number }) {
+  const router = useRouter();
+
   return (
     <Animated.View style={[styles.eventCard, useSlideUp(200 + index * 70)]}>
-      <View style={styles.redAccent} />
-      <View style={styles.eventHeader}>
-        <Text style={styles.eventTitle}>{event.title}</Text>
-        <NoxaBadge label={event.tag} />
-      </View>
-      <View style={styles.eventMetaGrid}>
-        <View style={styles.metaRow}>
-          <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
-          <Text style={styles.metaText}>{event.time}</Text>
+      <Pressable
+        accessibilityLabel={`View ${event.title}`}
+        accessibilityRole="button"
+        onPress={() => router.push('/event-details')}
+        style={({ pressed }) => [styles.eventPressable, pressed && styles.pressed]}>
+        <View style={styles.redAccent} />
+        <View style={styles.eventHeader}>
+          <Text style={styles.eventTitle}>{event.title}</Text>
+          <NoxaBadge label={event.tag} />
         </View>
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={16} color={colors.textMuted} />
-          <Text style={styles.metaText}>{event.location}</Text>
+        <View style={styles.eventMetaGrid}>
+          <View style={styles.metaRow}>
+            <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+            <Text style={styles.metaText}>{event.time}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Ionicons name="location-outline" size={16} color={colors.textMuted} />
+            <Text style={styles.metaText}>{event.location}</Text>
+          </View>
+          <View style={styles.metaRow}>
+            <Ionicons name="people-outline" size={16} color={colors.textMuted} />
+            <Text style={styles.metaText}>{event.participants}</Text>
+          </View>
         </View>
-        <View style={styles.metaRow}>
-          <Ionicons name="people-outline" size={16} color={colors.textMuted} />
-          <Text style={styles.metaText}>{event.participants}</Text>
-        </View>
-      </View>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -270,13 +281,15 @@ const styles = StyleSheet.create({
   },
   eventCard: {
     overflow: 'hidden',
-    padding: spacing.lg,
     borderRadius: radius.card,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.sm,
     ...shadows.card,
+  },
+  eventPressable: {
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   redAccent: {
     position: 'absolute',
