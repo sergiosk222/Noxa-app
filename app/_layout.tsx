@@ -23,6 +23,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="welcome" />
+        <Stack.Screen name="notifications" />
         <Stack.Screen name="(tabs)" />
       </Stack>
       <StatusBar style="light" />
