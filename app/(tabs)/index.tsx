@@ -223,6 +223,7 @@ function EventMarker() {
 }
 
 function EventCard() {
+  const router = useRouter();
   const entrance = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -243,7 +244,7 @@ function EventCard() {
         <Text style={styles.cardTitle}>{featuredEvent.title}</Text>
         <Text style={styles.cardSubtitle}>{featuredEvent.participantsCount} participants • Starts in 18 min</Text>
       </View>
-      <TouchableOpacity activeOpacity={0.82} style={styles.eventButton}>
+      <TouchableOpacity activeOpacity={0.82} onPress={() => router.push('/event-details')} style={styles.eventButton}>
         <Text style={styles.eventButtonText}>View Event</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.text} />
       </TouchableOpacity>
