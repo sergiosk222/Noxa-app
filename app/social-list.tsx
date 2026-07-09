@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "#0D0F14",
+    backgroundColor: colors.surface,
   },
   tabButton: {
     flex: 1,
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   activeTabButton: {
     backgroundColor: colors.surfaceSoft,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: colors.borderStrong,
   },
   tabText: {
     color: colors.textMuted,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "rgba(255,255,255,0.045)",
+    backgroundColor: colors.glass,
   },
   futureText: {
     flex: 1,
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: "rgba(34,197,94,0.12)",
   },
-  offlineBadge: { backgroundColor: "rgba(255,255,255,0.06)" },
+  offlineBadge: { backgroundColor: colors.glass },
   statusDot: {
     width: 6,
     height: 6,

@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   iconWrapActive: {
-    backgroundColor: 'rgba(255,45,45,0.14)',
+    backgroundColor: colors.primaryMuted,
   },
   activeIndicator: {
     position: 'absolute',

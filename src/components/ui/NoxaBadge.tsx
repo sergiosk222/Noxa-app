@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   primary: {
-    backgroundColor: 'rgba(255,45,45,0.14)',
+    backgroundColor: colors.primaryMuted,
     borderColor: 'rgba(255,45,45,0.32)',
   },
   success: {

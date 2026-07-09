@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { NoxaDivider, NoxaEmptyState, NoxaHeader, NoxaScreen } from '@/src/components/ui';
 import { mockSearchSections } from '@/src/data';
 import { colors, radius, shadows, spacing, typography } from '@/src/theme';
 import type { SearchCategory, SearchResult } from '@/src/types';
@@ -112,18 +112,14 @@ export default function SearchScreen() {
                 {section.results.map((result, index) => (
                   <View key={`${section.title}-${result.id}`}>
                     <ResultRow item={result} />
-                    {index < section.results.length - 1 ? <View style={styles.divider} /> : null}
+                    {index < section.results.length - 1 ? <NoxaDivider inset /> : null}
                   </View>
                 ))}
               </View>
             </View>
           ))
         ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="search" size={26} color={colors.textMuted} />
-            <Text style={styles.emptyTitle}>No matches yet</Text>
-            <Text style={styles.emptySubtitle}>Try a driver, car, crew, or event name.</Text>
-          </View>
+          <NoxaEmptyState icon="search" title="No matches yet" body="Try a driver, car, crew, or event name." />
         )}
       </ScrollView>
     </NoxaScreen>
@@ -138,8 +134,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: '#11141B',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
   },
   searchShell: {
     minHeight: 58,
@@ -148,10 +144,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg,
     paddingHorizontal: spacing.md,
-    borderRadius: 22,
+    borderRadius: radius.input,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: '#11141B',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     ...shadows.card,
   },
   searchInput: {
@@ -170,12 +166,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderColor: colors.border,
+    backgroundColor: colors.glass,
   },
   filterChipActive: {
-    borderColor: 'rgba(255,45,45,0.46)',
-    backgroundColor: 'rgba(255,45,45,0.16)',
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primaryMuted,
   },
   filterText: {
     color: colors.textMuted,
@@ -200,10 +196,10 @@ const styles = StyleSheet.create({
   },
   sectionCard: {
     overflow: 'hidden',
-    borderRadius: 26,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.09)',
-    backgroundColor: '#101319',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   resultRow: {
     minHeight: 76,
@@ -220,8 +216,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: '#1A1E27',
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceSoft,
   },
   resultCopy: {
     flex: 1,
@@ -244,8 +240,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
-    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderColor: colors.border,
+    backgroundColor: colors.glass,
   },
   typeBadgeText: {
     color: colors.textMuted,
@@ -253,31 +249,5 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
-  },
-  divider: {
-    height: 1,
-    marginLeft: 74,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  emptyState: {
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xxl,
-    padding: spacing.xl,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: '#101319',
-  },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '900',
-  },
-  emptySubtitle: {
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: '700',
-    textAlign: 'center',
   },
 });
