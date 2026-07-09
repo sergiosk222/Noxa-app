@@ -131,11 +131,12 @@ const ambientParticles = [
 type ActionButtonProps = {
   icon: keyof typeof Ionicons.glyphMap;
   accessibilityLabel: string;
+  onPress?: () => void;
 };
 
-function HeaderAction({ icon, accessibilityLabel }: ActionButtonProps) {
+function HeaderAction({ icon, accessibilityLabel, onPress }: ActionButtonProps) {
   return (
-    <TouchableOpacity accessibilityLabel={accessibilityLabel} activeOpacity={0.78} style={styles.headerAction}>
+    <TouchableOpacity accessibilityLabel={accessibilityLabel} activeOpacity={0.78} onPress={onPress} style={styles.headerAction}>
       <Ionicons name={icon} size={20} color={colors.text} />
     </TouchableOpacity>
   );
@@ -407,7 +408,7 @@ export default function LiveMapScreen() {
         </View>
         <View style={styles.headerActions}>
           <HeaderAction icon="search-outline" accessibilityLabel="Search" />
-          <HeaderAction icon="notifications-outline" accessibilityLabel="Notifications" />
+          <HeaderAction icon="notifications-outline" accessibilityLabel="Notifications" onPress={() => router.push('/notifications')} />
         </View>
       </View>
 
