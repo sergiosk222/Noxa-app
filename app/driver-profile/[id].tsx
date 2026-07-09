@@ -66,11 +66,19 @@ export default function PublicDriverProfileScreen() {
   const driver = getPublicDriverById(id);
   const [isFollowing, setIsFollowing] = useState(false);
   const stats = [
-    ["Followers", driver.stats.followers],
-    ["Following", driver.stats.following],
-    ["Cars", driver.stats.cars],
-    ["Events", driver.stats.events],
-    ["Reputation", driver.stats.reputation],
+    {
+      label: "Followers",
+      value: driver.stats.followers,
+      href: "/social-list?tab=followers",
+    },
+    {
+      label: "Following",
+      value: driver.stats.following,
+      href: "/social-list?tab=following",
+    },
+    { label: "Cars", value: driver.stats.cars },
+    { label: "Events", value: driver.stats.events },
+    { label: "Reputation", value: driver.stats.reputation },
   ];
 
   return (
@@ -124,11 +132,20 @@ export default function PublicDriverProfileScreen() {
         </View>
 
         <View style={styles.statsCard}>
-          {stats.map(([label, value]) => (
-            <View key={label} style={styles.statItem}>
-              <Text style={styles.statValue}>{value}</Text>
-              <Text style={styles.statLabel}>{label}</Text>
-            </View>
+          {stats.map((stat) => (
+            <Pressable
+              key={stat.label}
+              accessibilityRole={stat.href ? "button" : undefined}
+              onPress={stat.href ? () => router.push(stat.href) : undefined}
+              style={({ pressed }) => [
+                styles.statItem,
+                stat.href && styles.statLink,
+                pressed && stat.href && styles.pressed,
+              ]}
+            >
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </Pressable>
           ))}
         </View>
 
@@ -364,7 +381,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  statItem: { flex: 1, alignItems: "center", gap: 3 },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: spacing.xs,
+  },
+  statLink: { borderRadius: radius.md },
   statValue: { color: colors.text, fontSize: 17, fontWeight: "900" },
   statLabel: { color: colors.textMuted, fontSize: 10, fontWeight: "800" },
   sectionTitle: {
