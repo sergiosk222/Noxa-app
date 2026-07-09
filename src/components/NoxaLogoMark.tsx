@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: '#08090C',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.borderStrong,
     shadowColor: colors.accent,
     shadowOpacity: 0.28,
     shadowRadius: 28,
@@ -70,6 +70,6 @@ const styles = StyleSheet.create({
     height: 42,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
-    backgroundColor: 'rgba(255,255,255,0.055)',
+    backgroundColor: colors.glass,
   },
 });

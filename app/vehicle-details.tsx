@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   galleryRow: { gap: spacing.sm, paddingTop: spacing.md, paddingRight: spacing.lg },
   galleryImage: { width: 150, height: 126, overflow: 'hidden', borderRadius: radius.lg, backgroundColor: colors.surfaceSoft },
   galleryRadius: { borderRadius: radius.lg },
-  galleryFade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: radius.lg },
+  galleryFade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.10)', borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg },
   cardTitle: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
   infoList: { marginTop: spacing.md, gap: spacing.md },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },

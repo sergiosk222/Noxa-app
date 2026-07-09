@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.glass,
   },
   crewLabel: {
     color: colors.textMuted,

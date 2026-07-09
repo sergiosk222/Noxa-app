@@ -2,22 +2,22 @@ import { colors } from './colors';
 
 export const shadows = {
   card: {
-    shadowColor: '#000000',
-    shadowOpacity: 0.32,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 9,
+    shadowColor: colors.black,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
   redGlow: {
     shadowColor: colors.primary,
-    shadowOpacity: 0.32,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 9 },
+    elevation: 9,
   },
   control: {
-    shadowColor: '#000000',
-    shadowOpacity: 0.24,
+    shadowColor: colors.black,
+    shadowOpacity: 0.22,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
     elevation: 6,

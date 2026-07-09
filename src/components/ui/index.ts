@@ -7,3 +7,7 @@ export { NoxaHeader } from './NoxaHeader';
 export { NoxaInput } from './NoxaInput';
 export { NoxaScreen } from './NoxaScreen';
 export { NoxaSectionTitle } from './NoxaSectionTitle';
+
+export { NoxaDivider } from './NoxaDivider';
+export { NoxaEmptyState } from './NoxaEmptyState';
+export { NoxaIconButton } from './NoxaIconButton';

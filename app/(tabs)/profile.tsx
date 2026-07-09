@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
-    backgroundColor: "rgba(255,45,45,0.12)",
+    backgroundColor: colors.primarySubtle,
   },
   activityCopy: {
     flex: 1,

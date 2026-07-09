@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     width: 196,
     height: 196,
     borderRadius: 98,
-    backgroundColor: 'rgba(255,45,45,0.13)',
+    backgroundColor: colors.primaryMuted,
   },
   featuredTopRow: {
     flexDirection: 'row',
@@ -269,8 +269,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   categoryTabActive: {
-    backgroundColor: 'rgba(255,45,45,0.14)',
-    borderColor: 'rgba(255,45,45,0.34)',
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.borderAccent,
   },
   categoryText: {
     color: colors.textMuted,

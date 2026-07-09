@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { mockNotifications } from '@/src/data';
 import type { NotificationFilter, NoxaNotification } from '@/src/types';
-import { NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { NoxaEmptyState, NoxaHeader, NoxaScreen } from '@/src/components/ui';
 import { colors, radius, shadows, spacing, typography } from '@/src/theme';
 
 const filters: { label: string; value: NotificationFilter; types?: NoxaNotification['type'][] }[] = [
@@ -66,13 +66,11 @@ function NotificationCard({ notification }: { notification: NoxaNotification }) 
 
 function EmptyState() {
   return (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
-        <Ionicons name="notifications-off-outline" size={28} color={colors.textMuted} />
-      </View>
-      <Text style={styles.emptyTitle}>No notifications yet</Text>
-      <Text style={styles.emptyCopy}>When crews, events, drivers, and garage updates need attention, they’ll land here.</Text>
-    </View>
+    <NoxaEmptyState
+      icon="notifications-off-outline"
+      title="No notifications yet"
+      body="When crews, events, drivers, and garage updates need attention, they’ll land here."
+    />
   );
 }
 
@@ -161,11 +159,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#11141B',
+    backgroundColor: colors.surface,
   },
   filterChipActive: {
-    borderColor: 'rgba(255,36,36,0.58)',
-    backgroundColor: 'rgba(255,36,36,0.12)',
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primaryMuted,
   },
   filterText: {
     color: colors.textMuted,
@@ -201,13 +199,13 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: '#11141A',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     ...shadows.card,
   },
   importantCard: {
-    borderColor: 'rgba(255,36,36,0.36)',
-    backgroundColor: '#151116',
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.surfaceRaised,
   },
   iconRail: {
     width: 44,
@@ -216,12 +214,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: '#0A0D12',
+    borderColor: colors.border,
+    backgroundColor: colors.background,
   },
   importantIconRail: {
-    borderColor: 'rgba(255,36,36,0.36)',
-    backgroundColor: 'rgba(255,36,36,0.1)',
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primarySubtle,
   },
   cardBody: {
     flex: 1,
@@ -276,38 +274,5 @@ const styles = StyleSheet.create({
   },
   actionTextImportant: {
     color: colors.accent,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 360,
-    padding: spacing.xxl,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: '#101318',
-  },
-  emptyIcon: {
-    width: 62,
-    height: 62,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    borderRadius: radius.pill,
-    backgroundColor: '#080A0E',
-  },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: typography.sectionTitle,
-    fontWeight: '900',
-  },
-  emptyCopy: {
-    maxWidth: 280,
-    marginTop: spacing.sm,
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: '700',
-    lineHeight: 19,
-    textAlign: 'center',
   },
 });

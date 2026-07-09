@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colors, radius, shadows, spacing, typography } from '@/src/theme';
+import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
-type NoxaButtonVariant = 'primary' | 'secondary' | 'ghost';
+type NoxaButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 type NoxaButtonProps = {
   title: string;
@@ -10,71 +10,55 @@ type NoxaButtonProps = {
   variant?: NoxaButtonVariant;
   disabled?: boolean;
   fullWidth?: boolean;
+  loading?: boolean;
 };
 
-export function NoxaButton({ title, onPress, variant = 'primary', disabled = false, fullWidth = false }: NoxaButtonProps) {
+export function NoxaButton({ title, onPress, variant = 'primary', disabled = false, fullWidth = false, loading = false }: NoxaButtonProps) {
+  const isDisabled = disabled || loading;
+
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled}
+      disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
         styles[variant],
         fullWidth && styles.fullWidth,
-        pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
+        pressed && !isDisabled && styles.pressed,
+        isDisabled && styles.disabled,
       ]}>
-      <Text style={[styles.text, styles[`${variant}Text`], disabled && styles.disabledText]}>{title}</Text>
+      <Text style={[styles.text, styles[`${variant}Text`], isDisabled && styles.disabledText]}>{loading ? 'Loading…' : title}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    height: 54,
+    minHeight: 52,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-    borderRadius: radius.pill,
-  },
-  fullWidth: {
-    width: '100%',
-  },
-  primary: {
-    backgroundColor: colors.primary,
-    ...shadows.redGlow,
-  },
-  secondary: {
-    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.button,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'transparent',
   },
-  ghost: {
-    backgroundColor: 'transparent',
-  },
-  pressed: {
-    opacity: 0.9,
-    transform: [{ translateY: 1 }, { scale: 0.98 }],
-  },
-  disabled: {
-    opacity: 0.45,
-  },
+  fullWidth: { width: '100%' },
+  primary: { backgroundColor: colors.primary, borderColor: colors.primary, ...shadows.redGlow },
+  secondary: { backgroundColor: colors.surfaceSoft, borderColor: colors.border },
+  ghost: { backgroundColor: 'transparent', borderColor: 'transparent' },
+  danger: { backgroundColor: colors.accentDark, borderColor: colors.borderAccent },
+  pressed: { opacity: 0.9, transform: [{ translateY: 1 }, { scale: animations.pressedScale }] },
+  disabled: { opacity: 0.45 },
   text: {
     fontSize: typography.body,
     fontWeight: '800',
-    letterSpacing: 0.1,
+    letterSpacing: typography.letterSpacing.caption,
+    lineHeight: typography.lineHeight.body,
   },
-  primaryText: {
-    color: colors.text,
-  },
-  secondaryText: {
-    color: colors.text,
-  },
-  ghostText: {
-    color: colors.textMuted,
-  },
-  disabledText: {
-    color: colors.textMuted,
-  },
+  primaryText: { color: colors.text },
+  secondaryText: { color: colors.text },
+  ghostText: { color: colors.textMuted },
+  dangerText: { color: colors.text },
+  disabledText: { color: colors.textMuted },
 });

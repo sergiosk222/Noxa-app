@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surfaceSoft,
   },
   pressed: { opacity: 0.82, transform: [{ scale: 0.98 }] },
@@ -262,8 +262,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "#0D1017",
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
     ...shadows.card,
   },
   heroGlow: {
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: colors.glass,
   },
   metaText: {
     flexShrink: 1,
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: colors.border,
     backgroundColor: colors.surfaceSoft,
   },
   listCard: {
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
-    backgroundColor: "rgba(255,45,45,0.12)",
+    backgroundColor: colors.primarySubtle,
   },
   activityCopy: { flex: 1 },
   activityLabel: {
