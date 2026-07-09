@@ -1,20 +1,28 @@
 import type { ReactNode } from 'react';
-import type { StyleProp, ViewStyle } from 'react-native';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { NoxaAnimatedCard } from './NoxaAnimatedCard';
+import { colors, radius, shadows, spacing } from '@/src/theme';
 
 type NoxaCardProps = {
   children: ReactNode;
-  style?: StyleProp<ViewStyle>;
-  delay?: number;
+  style?: ViewStyle | ViewStyle[];
   compact?: boolean;
 };
 
-export function NoxaCard({ children, style, compact = false, delay = 0 }: NoxaCardProps) {
-  return (
-    <NoxaAnimatedCard compact={compact} delay={delay} style={style}>
-      {children}
-    </NoxaAnimatedCard>
-  );
+export function NoxaCard({ children, style, compact = false }: NoxaCardProps) {
+  return <View style={[styles.card, compact && styles.compact, style]}>{children}</View>;
 }
 
+const styles = StyleSheet.create({
+  card: {
+    padding: spacing.lg,
+    borderRadius: radius.card,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  compact: {
+    padding: spacing.md,
+  },
+});

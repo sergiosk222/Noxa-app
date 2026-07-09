@@ -2,11 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 
 import { NoxaDivider, NoxaEmptyState, NoxaHeader, NoxaScreen } from '@/src/components/ui';
 import { mockSearchSections } from '@/src/data';
-import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
+import { colors, radius, shadows, spacing, typography } from '@/src/theme';
 import type { SearchCategory, SearchResult } from '@/src/types';
 
 const FILTERS: { label: string; value: SearchCategory }[] = [
@@ -111,10 +110,10 @@ export default function SearchScreen() {
               <Text style={styles.sectionTitle}>{section.title}</Text>
               <View style={styles.sectionCard}>
                 {section.results.map((result, index) => (
-                  <Animated.View key={`${section.title}-${result.id}`} entering={FadeInDown.duration(animations.base).delay(index * 28).easing(Easing.out(Easing.cubic))}>
+                  <View key={`${section.title}-${result.id}`}>
                     <ResultRow item={result} />
                     {index < section.results.length - 1 ? <NoxaDivider inset /> : null}
-                  </Animated.View>
+                  </View>
                 ))}
               </View>
             </View>

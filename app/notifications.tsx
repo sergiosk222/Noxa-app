@@ -2,12 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, FadeInDown } from 'react-native-reanimated';
 
 import { mockNotifications } from '@/src/data';
 import type { NotificationFilter, NoxaNotification } from '@/src/types';
 import { NoxaEmptyState, NoxaHeader, NoxaScreen } from '@/src/components/ui';
-import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
+import { colors, radius, shadows, spacing, typography } from '@/src/theme';
 
 const filters: { label: string; value: NotificationFilter; types?: NoxaNotification['type'][] }[] = [
   { label: 'All', value: 'all' },
@@ -36,9 +35,8 @@ function FilterChip({ isActive, label, onPress }: { isActive: boolean; label: st
   );
 }
 
-function NotificationCard({ notification, delay = 0 }: { notification: NoxaNotification; delay?: number }) {
+function NotificationCard({ notification }: { notification: NoxaNotification }) {
   return (
-    <Animated.View entering={FadeInDown.duration(animations.base).delay(delay).easing(Easing.out(Easing.cubic))}>
     <Pressable style={({ pressed }) => [styles.card, notification.isImportant && styles.importantCard, pressed && styles.pressed]}>
       <View style={[styles.iconRail, notification.isImportant && styles.importantIconRail]}>
         <Ionicons name={notification.icon} size={20} color={notification.isImportant ? colors.accent : colors.text} />
@@ -63,7 +61,6 @@ function NotificationCard({ notification, delay = 0 }: { notification: NoxaNotif
 
       <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
     </Pressable>
-    </Animated.View>
   );
 }
 
@@ -116,8 +113,8 @@ export default function NotificationsScreen() {
                 <View key={section} style={styles.section}>
                   <Text style={styles.sectionTitle}>{section}</Text>
                   <View style={styles.cardStack}>
-                    {sectionNotifications.map((notification, index) => (
-                      <NotificationCard key={notification.id} notification={notification} delay={index * 32} />
+                    {sectionNotifications.map((notification) => (
+                      <NotificationCard key={notification.id} notification={notification} />
                     ))}
                   </View>
                 </View>
