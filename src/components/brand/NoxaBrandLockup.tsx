@@ -2,25 +2,27 @@ import { StyleSheet, View } from 'react-native';
 
 import { spacing } from '@/src/theme';
 
-import { NoxaLogoMark } from './NoxaLogoMark';
+import { NoxaLogoSvg } from './NoxaLogoSvg';
 import { NoxaWordmark } from './NoxaWordmark';
 
 type NoxaBrandLockupProps = {
   size?: number;
+  glow?: boolean;
   showWordmark?: boolean;
   showSlogan?: boolean;
   compact?: boolean;
 };
 
 export function NoxaBrandLockup({
-  size = 156,
+  size = 160,
+  glow = true,
   showWordmark = true,
   showSlogan = true,
   compact = false,
 }: NoxaBrandLockupProps) {
   return (
     <View style={[styles.lockup, compact && styles.compactLockup]}>
-      <NoxaLogoMark size={size} compact={compact} />
+      <NoxaLogoSvg size={size} glow={glow} />
       {showWordmark ? (
         <View style={[styles.wordmarkBlock, compact && styles.compactWordmarkBlock]}>
           <NoxaWordmark size={compact ? size * 0.2 : size * 0.27} showSlogan={showSlogan} compact={compact} />
