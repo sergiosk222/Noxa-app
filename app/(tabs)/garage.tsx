@@ -72,7 +72,8 @@ function HeroCard() {
   }, [opacity, scale]);
 
   return (
-    <Animated.View style={[styles.heroCard, { opacity, transform: [{ scale }] }]}>
+    <Animated.View style={[{ opacity, transform: [{ scale }] }]}>
+      <Pressable accessibilityLabel="Open vehicle details" accessibilityRole="button" onPress={() => router.push('/vehicle-details')} style={({ pressed }) => [styles.heroCard, pressed && styles.pressed]}>
       <ImageBackground source={{ uri: car.image }} resizeMode="cover" style={styles.heroImage} imageStyle={styles.heroImageRadius as ImageStyle}>
         <View style={styles.heroShade} />
         <View style={styles.heroContent}>
@@ -83,6 +84,7 @@ function HeroCard() {
           </View>
         </View>
       </ImageBackground>
+      </Pressable>
     </Animated.View>
   );
 }
