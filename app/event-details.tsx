@@ -1,417 +1,202 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { NoxaBadge, NoxaButton, NoxaScreen } from '@/src/components/ui';
+import { NoxaScreen } from '@/src/components/ui';
 import { featuredEvent } from '@/src/data';
 import { colors, radius, shadows, spacing, typography } from '@/src/theme';
 
-const eventDetails = {
-  ...featuredEvent,
-  about: 'A premium night cruise through Thessaloniki’s waterfront with selected cars and crews.',
-  attendanceOptions: ['Going', 'Maybe', 'Not going'] as const,
-  rules: ['Respect traffic laws', 'No dangerous driving', 'Crew leaders only approval'],
-  participantsPreview: ['AK', 'MR', 'SX', 'VN', 'GT'],
-};
+const coverImage = 'https://images.unsplash.com/photo-1503736334956-4c8f8e92946d?auto=format&fit=crop&w=1400&q=88';
+const hostAvatar = 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=240&q=80';
+const participantAvatars = [
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=160&q=80',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
+] as const;
 
-function Header() {
-  const router = useRouter();
+const requirements = ['Respect others', 'No dangerous driving', 'Public roads only', 'Keep the area clean'] as const;
+const futureSections = ['Chat', 'Photos', 'Comments', 'Announcements', 'Live location', 'Check-in'] as const;
 
+function HeaderAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress?: () => void }) {
   return (
-    <View style={styles.header}>
-      <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={() => router.back()} style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
-        <Ionicons name="chevron-back" size={24} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>EVENT</Text>
-      <Pressable accessibilityLabel="Share event" accessibilityRole="button" style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
-        <Ionicons name="share-outline" size={22} color={colors.text} />
-      </Pressable>
-    </View>
+    <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.headerAction, pressed && styles.pressed]}>
+      <Ionicons name={icon} size={21} color={colors.text} />
+    </Pressable>
   );
 }
 
 function Hero() {
   return (
-    <View style={styles.hero}>
-      <View style={styles.heroGlow} />
-      <View style={styles.heroTopRow}>
-        <NoxaBadge label="FEATURED" variant="primary" />
-        <View style={styles.goingPill}>
-          <Ionicons name="people" size={15} color={colors.primary} />
-          <Text style={styles.goingText}>{eventDetails.participantsCount} going</Text>
+    <View style={styles.heroCard}>
+      <Image source={{ uri: coverImage }} style={styles.heroImage} />
+      <View style={styles.heroShade} />
+      <View style={styles.heroBottomShade} />
+      <View style={styles.heroContent}>
+        <Text style={styles.heroKicker}>Featured event</Text>
+        <Text style={styles.heroTitle}>{featuredEvent.title}</Text>
+        <View style={styles.heroMetaRow}>
+          <Ionicons name="location-outline" size={17} color={colors.text} />
+          <Text style={styles.heroMeta}>{featuredEvent.location}</Text>
         </View>
-      </View>
-      <View style={styles.heroCopy}>
-        <Text style={styles.heroTitle}>{eventDetails.title}</Text>
-        <View style={styles.metaRow}>
-          <Ionicons name="location-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.metaText}>{eventDetails.location}</Text>
-        </View>
-        <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={18} color={colors.textMuted} />
-          <Text style={styles.metaText}>{eventDetails.timeLabel}</Text>
+        <View style={styles.heroMetaRow}>
+          <Ionicons name="time-outline" size={17} color={colors.text} />
+          <Text style={styles.heroMeta}>{featuredEvent.timeLabel}</Text>
         </View>
       </View>
     </View>
   );
 }
 
-function MatteCard({ children }: { children: ReactNode }) {
-  return <View style={styles.card}>{children}</View>;
-}
-
-function Attendance() {
+function HostCard() {
   return (
-    <MatteCard>
-      <Text style={styles.cardTitle}>Attendance</Text>
-      <View style={styles.attendanceRow}>
-        {eventDetails.attendanceOptions.map((option, index) => (
-          <Pressable key={option} accessibilityRole="button" style={({ pressed }) => [styles.attendanceOption, index === 0 && styles.attendanceOptionActive, pressed && styles.pressed]}>
-            <Text style={[styles.attendanceText, index === 0 && styles.attendanceTextActive]}>{option}</Text>
-          </Pressable>
-        ))}
+    <View style={styles.cardCompact}>
+      <Image source={{ uri: hostAvatar }} style={styles.hostAvatar} />
+      <View style={styles.hostCopy}>
+        <Text style={styles.eyebrow}>Host</Text>
+        <Text style={styles.hostName}>Nikos Varela</Text>
+        <Text style={styles.mutedText}>Midnight Society Crew</Text>
       </View>
-    </MatteCard>
-  );
-}
-
-function LocationPreview() {
-  return (
-    <MatteCard>
-      <Text style={styles.cardTitle}>Location preview</Text>
-      <View style={styles.mapPreview}>
-        <View style={styles.mapLineHorizontal} />
-        <View style={styles.mapLineVertical} />
-        <View style={styles.mapPin}>
-          <Ionicons name="location" size={19} color={colors.text} />
-        </View>
-      </View>
-      <View style={styles.locationFooter}>
-        <View>
-          <Text style={styles.locationTitle}>{eventDetails.location}</Text>
-          <Text style={styles.mutedText}>Meeting point preview</Text>
-        </View>
-        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}>
-          <Text style={styles.mapButtonText}>Open on Map</Text>
-        </Pressable>
-      </View>
-    </MatteCard>
+      <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
+    </View>
   );
 }
 
 function Participants() {
   return (
-    <MatteCard>
-      <Text style={styles.cardTitle}>Participants</Text>
-      <View style={styles.participantsRow}>
-        <View style={styles.avatarStack}>
-          {eventDetails.participantsPreview.map((initials, index) => (
-            <View key={initials} style={[styles.avatar, { marginLeft: index === 0 ? 0 : -10 }]}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
-          ))}
-        </View>
-        <Text style={styles.participantsText}>{eventDetails.participantsCount} drivers going</Text>
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Participants</Text>
+        <Text style={styles.sectionMeta}>{featuredEvent.participantsCount} going</Text>
       </View>
-    </MatteCard>
+      <View style={styles.avatarRow}>
+        {participantAvatars.map((avatar, index) => (
+          <Image key={avatar} source={{ uri: avatar }} style={[styles.participantAvatar, { marginLeft: index === 0 ? 0 : -10 }]} />
+        ))}
+        <View style={styles.moreAvatar}>
+          <Text style={styles.moreText}>+18</Text>
+        </View>
+        <Text style={styles.moreLabel}>more</Text>
+      </View>
+    </View>
   );
 }
 
-function Rules() {
+function MeetingPoint() {
   return (
-    <MatteCard>
-      <Text style={styles.cardTitle}>Rules</Text>
-      <View style={styles.rulesList}>
-        {eventDetails.rules.map((rule) => (
-          <View key={rule} style={styles.ruleRow}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-            <Text style={styles.ruleText}>{rule}</Text>
-          </View>
-        ))}
+    <View style={styles.sectionCard}>
+      <Text style={styles.sectionTitle}>Meeting Point</Text>
+      <Text style={styles.locationName}>Thessaloniki Waterfront — White Tower side</Text>
+      <View style={styles.mapPlaceholder}>
+        <View style={styles.mapRoadOne} />
+        <View style={styles.mapRoadTwo} />
+        <View style={styles.mapPin}>
+          <Ionicons name="location" size={19} color={colors.text} />
+        </View>
+        <Text style={styles.mapLabel}>Map preview</Text>
       </View>
-    </MatteCard>
+      <Pressable accessibilityRole="button" style={({ pressed }) => [styles.mapsButton, pressed && styles.pressed]}>
+        <Text style={styles.mapsButtonText}>Open in Maps</Text>
+        <Ionicons name="open-outline" size={16} color={colors.text} />
+      </Pressable>
+    </View>
   );
 }
 
 export default function EventDetailsScreen() {
+  const router = useRouter();
+  const [joined, setJoined] = useState(false);
+
   return (
     <NoxaScreen padded={false}>
+      <View style={styles.header}>
+        <HeaderAction icon="chevron-back" label="Go back" onPress={() => router.back()} />
+        <HeaderAction icon="share-outline" label="Share event" />
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        <Header />
         <Hero />
-        <MatteCard>
-          <Text style={styles.cardTitle}>About this event</Text>
-          <Text style={styles.bodyText}>{eventDetails.about}</Text>
-        </MatteCard>
-        <Attendance />
-        <LocationPreview />
+        <HostCard />
         <Participants />
-        <Rules />
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.description}>A clean night meet for premium builds, photos, and a relaxed waterfront roll-in. Keep it respectful, low-key, and community-first.</Text>
+        </View>
+        <MeetingPoint />
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Requirements</Text>
+          {requirements.map((item) => (
+            <View key={item} style={styles.requirementRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={styles.requirementText}>{item}</Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.futureGrid}>
+          {futureSections.map((item) => (
+            <View key={item} style={styles.futurePill}>
+              <Text style={styles.futureText}>{item}</Text>
+            </View>
+          ))}
+        </View>
       </ScrollView>
-      <View style={styles.ctaWrap} pointerEvents="box-none">
-        <NoxaButton title="I’m Going" fullWidth />
+
+      <View style={styles.bottomBar}>
+        <Pressable accessibilityRole="button" onPress={() => setJoined((value) => !value)} style={({ pressed }) => [styles.joinButton, joined && styles.joinedButton, pressed && styles.pressed]}>
+          <Text style={styles.joinText}>{joined ? 'Joined' : 'Join Event'}</Text>
+        </Pressable>
       </View>
     </NoxaScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: 122,
-    gap: spacing.lg,
-  },
-  header: {
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  headerTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  pressed: {
-    opacity: 0.82,
-    transform: [{ translateY: 1 }, { scale: 0.98 }],
-  },
-  hero: {
-    minHeight: 286,
-    overflow: 'hidden',
-    justifyContent: 'space-between',
-    padding: spacing.xl,
-    borderRadius: radius.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  heroGlow: {
-    position: 'absolute',
-    right: -70,
-    top: -58,
-    width: 210,
-    height: 210,
-    borderRadius: 105,
-    backgroundColor: 'rgba(255,45,45,0.16)',
-  },
-  heroTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  goingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  goingText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: '800',
-  },
-  heroCopy: {
-    gap: spacing.sm,
-  },
-  heroTitle: {
-    color: colors.text,
-    fontSize: 42,
-    fontWeight: '900',
-    letterSpacing: -1.2,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  metaText: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  card: {
-    padding: spacing.lg,
-    borderRadius: radius.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.md,
-    ...shadows.card,
-  },
-  cardTitle: {
-    color: colors.text,
-    fontSize: typography.cardTitle,
-    fontWeight: '900',
-    letterSpacing: -0.2,
-  },
-  bodyText: {
-    color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: '600',
-    lineHeight: 24,
-  },
-  attendanceRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  attendanceOption: {
-    flex: 1,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  attendanceOptionActive: {
-    backgroundColor: 'rgba(255,45,45,0.15)',
-    borderColor: 'rgba(255,45,45,0.42)',
-  },
-  attendanceText: {
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: '900',
-  },
-  attendanceTextActive: {
-    color: colors.text,
-  },
-  mapPreview: {
-    height: 156,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.lg,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  mapLineHorizontal: {
-    position: 'absolute',
-    width: '120%',
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    transform: [{ rotate: '-14deg' }],
-  },
-  mapLineVertical: {
-    position: 'absolute',
-    width: 1,
-    height: '120%',
-    backgroundColor: colors.glass,
-    transform: [{ rotate: '28deg' }],
-  },
-  mapPin: {
-    width: 46,
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-    ...shadows.redGlow,
-  },
-  locationFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  locationTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '900',
-  },
-  mutedText: {
-    marginTop: spacing.xxs,
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: '700',
-  },
-  mapButton: {
-    minHeight: 40,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  mapButtonText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: '900',
-  },
-  participantsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  avatarStack: {
-    flexDirection: 'row',
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 2,
-    borderColor: colors.surface,
-  },
-  avatarText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: '900',
-  },
-  participantsText: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: '800',
-    textAlign: 'right',
-  },
-  rulesList: {
-    gap: spacing.sm,
-  },
-  ruleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  ruleText: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: '700',
-  },
-  ctaWrap: {
-    position: 'absolute',
-    left: spacing.lg,
-    right: spacing.lg,
-    bottom: spacing.xl,
-  },
+  header: { position: 'absolute', top: spacing.lg, left: spacing.lg, right: spacing.lg, zIndex: 10, flexDirection: 'row', justifyContent: 'space-between' },
+  headerAction: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', backgroundColor: 'rgba(8,10,14,0.72)' },
+  pressed: { opacity: 0.86, transform: [{ translateY: 1 }, { scale: 0.98 }] },
+  content: { paddingBottom: 132, gap: spacing.lg },
+  heroCard: { height: 390, overflow: 'hidden', borderBottomLeftRadius: 36, borderBottomRightRadius: 36, backgroundColor: colors.surface, ...shadows.card },
+  heroImage: { width: '100%', height: '100%' },
+  heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.28)' },
+  heroBottomShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 210, backgroundColor: 'rgba(0,0,0,0.64)' },
+  heroContent: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.xl, gap: spacing.xs },
+  heroKicker: { color: colors.primary, fontSize: typography.caption, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
+  heroTitle: { color: colors.text, fontSize: 43, fontWeight: '900', letterSpacing: -1.3 },
+  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  heroMeta: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
+  cardCompact: { marginHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.card },
+  hostAvatar: { width: 58, height: 58, borderRadius: radius.pill, borderWidth: 2, borderColor: 'rgba(255,255,255,0.72)' },
+  hostCopy: { flex: 1 },
+  eyebrow: { color: colors.primary, fontSize: 11, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
+  hostName: { marginTop: 2, color: colors.text, fontSize: typography.cardTitle, fontWeight: '900' },
+  mutedText: { marginTop: 2, color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
+  sectionCard: { marginHorizontal: spacing.lg, gap: spacing.md, padding: spacing.lg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, ...shadows.card },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  sectionTitle: { color: colors.text, fontSize: typography.sectionTitle, fontWeight: '900', letterSpacing: -0.3 },
+  sectionMeta: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '800' },
+  avatarRow: { flexDirection: 'row', alignItems: 'center' },
+  participantAvatar: { width: 42, height: 42, borderRadius: radius.pill, borderWidth: 2, borderColor: colors.surface },
+  moreAvatar: { width: 42, height: 42, marginLeft: -10, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: colors.borderAccent, backgroundColor: colors.primaryMuted },
+  moreText: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  moreLabel: { marginLeft: spacing.sm, color: colors.textMuted, fontSize: typography.caption, fontWeight: '800' },
+  description: { color: colors.textMuted, fontSize: typography.body, fontWeight: '600', lineHeight: 24 },
+  locationName: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
+  mapPlaceholder: { height: 132, overflow: 'hidden', borderRadius: 24, borderWidth: 1, borderColor: colors.border, backgroundColor: '#080A0F' },
+  mapRoadOne: { position: 'absolute', left: -20, top: 44, width: '118%', height: 26, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.08)', transform: [{ rotate: '-12deg' }] },
+  mapRoadTwo: { position: 'absolute', left: 70, top: -12, width: 28, height: 170, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.055)', transform: [{ rotate: '34deg' }] },
+  mapPin: { position: 'absolute', left: '48%', top: 42, width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.primary, ...shadows.redGlow },
+  mapLabel: { position: 'absolute', left: spacing.md, bottom: spacing.md, color: colors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
+  mapsButton: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surfaceSoft },
+  mapsButtonText: { color: colors.text, fontSize: typography.caption, fontWeight: '900' },
+  requirementRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  requirementText: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
+  futureGrid: { marginHorizontal: spacing.lg, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  futurePill: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.glass },
+  futureText: { color: colors.textMuted, fontSize: 12, fontWeight: '900' },
+  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.xl, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: 'rgba(5,6,8,0.94)' },
+  joinButton: { height: 58, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.primary, ...shadows.redGlow },
+  joinedButton: { backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.borderStrong, shadowOpacity: 0 },
+  joinText: { color: colors.text, fontSize: typography.body, fontWeight: '900', letterSpacing: 0.3 },
 });
