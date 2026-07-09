@@ -11,4 +11,5 @@ export type UserProfile = {
   crewsCount: number;
   eventsCount: number;
   followersCount: number;
+  followingCount: number;
 };
