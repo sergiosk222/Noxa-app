@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { NoxaBadge, NoxaButton, NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { NoxaBadge, NoxaHeader, NoxaScreen } from '@/src/components/ui';
 import { featuredCrew, mockCrews } from '@/src/data';
 import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
@@ -80,7 +80,9 @@ function FeaturedCrewCard() {
         </View>
       </View>
 
-      <NoxaButton title="View Crew" fullWidth />
+      <Pressable accessibilityLabel="View Crew" accessibilityRole="button" style={({ pressed }) => [styles.featuredCta, pressed && styles.pressed]}>
+        <Text style={styles.featuredCtaText}>View Crew</Text>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -242,6 +244,26 @@ const styles = StyleSheet.create({
   featuredStats: {
     marginTop: spacing.xs,
     gap: spacing.xs,
+  },
+  featuredCta: {
+    width: '100%',
+    minHeight: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+    ...shadows.redGlow,
+  },
+  featuredCtaText: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: '800',
+    letterSpacing: typography.letterSpacing.caption,
+    lineHeight: typography.lineHeight.body,
+    textAlign: 'center',
   },
   metaRow: {
     flexDirection: 'row',
