@@ -294,6 +294,7 @@ const quickStats = [
 ] as const;
 
 function DriverPreviewCard({ driver, onClose, onViewProfile }: { driver: DriverPreview; onClose: () => void; onViewProfile: (driver: DriverPreview) => void }) {
+  const [isFollowing, setIsFollowing] = useState(false);
   const translateY = useRef(new Animated.Value(430)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
 
@@ -377,6 +378,13 @@ function DriverPreviewCard({ driver, onClose, onViewProfile }: { driver: DriverP
         <View style={styles.actionRow}>
           <TouchableOpacity activeOpacity={0.86} onPress={() => onViewProfile(driver)} style={styles.profileButton}>
             <Text style={styles.profileButtonText}>View Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() => setIsFollowing((value) => !value)}
+            style={[styles.followButton, isFollowing && styles.followingButton]}
+          >
+            <Text style={styles.followButtonText}>{isFollowing ? 'Following' : 'Follow'}</Text>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.82} style={styles.messageButton}>
             <Text style={styles.messageButtonText}>Message</Text>
@@ -579,9 +587,12 @@ const styles = StyleSheet.create({
   statIcon: { fontSize: 16 },
   statValue: { marginTop: 3, color: colors.text, fontSize: typography.body, fontWeight: '900' },
   statLabel: { marginTop: 2, color: colors.textMuted, fontSize: 9, fontWeight: '800' },
-  actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  profileButton: { flex: 1.35, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.accentDark, borderWidth: 1, borderColor: 'rgba(255,80,80,0.62)', shadowColor: colors.accent, shadowOpacity: 0.46, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
+  actionRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.lg },
+  profileButton: { flex: 1.28, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.accentDark, borderWidth: 1, borderColor: 'rgba(255,80,80,0.62)', shadowColor: colors.accent, shadowOpacity: 0.46, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
   profileButtonText: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
-  messageButton: { flex: 1, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.08)' },
-  messageButtonText: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
+  followButton: { flex: 0.9, minWidth: 0, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,80,80,0.58)', backgroundColor: colors.accentDark },
+  followingButton: { borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.08)' },
+  followButtonText: { color: colors.text, fontSize: typography.caption, fontWeight: '900' },
+  messageButton: { flex: 0.9, minWidth: 0, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.08)' },
+  messageButtonText: { color: colors.text, fontSize: typography.caption, fontWeight: '900' },
 });

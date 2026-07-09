@@ -18,6 +18,7 @@ const profile = {
     { label: 'Crews', value: String(currentUser.crewsCount) },
     { label: 'Events', value: String(currentUser.eventsCount) },
     { label: 'Followers', value: String(currentUser.followersCount) },
+    { label: 'Following', value: String(currentUser.followingCount) },
   ],
   achievements: ['Night Driver', 'Crew Leader', 'Early Member'],
   activity: {

@@ -11,6 +11,7 @@ export const mockUsers: UserProfile[] = [
     crewsCount: 1,
     eventsCount: 24,
     followersCount: 148,
+    followingCount: 86,
   },
 ];
 

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import {
   Image,
   Pressable,
@@ -39,12 +40,16 @@ function HeaderAction({
 function ProfileActionButton({
   title,
   variant = "primary",
+  onPress,
 }: {
   title: string;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "following";
+  onPress?: () => void;
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
       style={({ pressed }) => [
         styles.profileActionButton,
         styles[`${variant}ActionButton`],
@@ -59,6 +64,7 @@ function ProfileActionButton({
 export default function PublicDriverProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const driver = getPublicDriverById(id);
+  const [isFollowing, setIsFollowing] = useState(false);
   const stats = [
     ["Followers", driver.stats.followers],
     ["Following", driver.stats.following],
@@ -108,7 +114,11 @@ export default function PublicDriverProfileScreen() {
             </View>
           </View>
           <View style={styles.actionRow}>
-            <ProfileActionButton title="Follow" />
+            <ProfileActionButton
+              title={isFollowing ? "Following" : "Follow"}
+              variant={isFollowing ? "following" : "primary"}
+              onPress={() => setIsFollowing((value) => !value)}
+            />
             <ProfileActionButton title="Message" variant="secondary" />
           </View>
         </View>
@@ -333,6 +343,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceSoft,
+  },
+  followingActionButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   profileActionText: {
     color: colors.text,
