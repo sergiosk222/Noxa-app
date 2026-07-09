@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, type ImageStyle } from 'react-native';
 
@@ -195,7 +196,7 @@ export default function GarageScreen() {
         <InstalledPartsCard />
         <GalleryCard />
         <ActivityCard />
-        <NoxaButton title="Edit Vehicle" fullWidth />
+        <NoxaButton title="Edit Vehicle" fullWidth onPress={() => router.push('/vehicle-editor')} />
       </ScrollView>
     </NoxaScreen>
   );
