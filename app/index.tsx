@@ -1,5 +1,10 @@
-import { Redirect } from 'expo-router';
+import { router } from 'expo-router';
+import { useEffect } from 'react';
 
 export default function IndexRoute() {
-  return <Redirect href="/(tabs)" />;
+  useEffect(() => {
+    router.replace('/welcome');
+  }, []);
+
+  return null;
 }
