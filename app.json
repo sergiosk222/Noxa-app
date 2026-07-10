@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "noxa",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -30,9 +30,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#050608",
+          "backgroundColor": "#080A0F",
           "dark": {
-            "backgroundColor": "#050608"
+            "backgroundColor": "#080A0F"
           }
         }
       ]
@@ -42,7 +42,7 @@
       "reactCompiler": true
     },
     "splash": {
-      "backgroundColor": "#050608"
+      "backgroundColor": "#080A0F"
     }
   }
 }
