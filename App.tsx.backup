@@ -11,12 +11,9 @@ declare const require: NodeRequire & {
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
-console.log('[App] module loaded');
-
 const ctx = require.context('./app');
 
 export default function App() {
-  console.log('[App] rendered');
   const [isSplashComplete, setIsSplashComplete] = useState(false);
   const hasHiddenNativeSplash = useRef(false);
 
