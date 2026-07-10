@@ -7,7 +7,6 @@ import {
   View,
   type LayoutChangeEvent,
 } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
 
 const BACKGROUND = '#080A0F';
 const ACCENT = '#FF2A2A';
@@ -15,6 +14,7 @@ const TEXT = '#F4F4F5';
 
 type NoxaSplashScreenProps = {
   onFinish: () => void;
+  onLayoutReady: () => void;
 };
 
 function NoxaLogo({ size }: { size: number }) {
@@ -33,7 +33,7 @@ function NoxaLogo({ size }: { size: number }) {
   );
 }
 
-export function NoxaSplashScreen({ onFinish }: NoxaSplashScreenProps) {
+export function NoxaSplashScreen({ onFinish, onLayoutReady }: NoxaSplashScreenProps) {
   const { width, height } = Dimensions.get('window');
   const lineWidth = Math.min(width * 0.54, 260);
   const logoSize = Math.min(Math.max(width * 0.18, 68), 92);
@@ -61,6 +61,7 @@ export function NoxaSplashScreen({ onFinish }: NoxaSplashScreenProps) {
       return;
     }
     hasFinishedRef.current = true;
+    console.log('[Splash] animation finished');
     onFinish();
   }, [onFinish]);
 
@@ -69,6 +70,7 @@ export function NoxaSplashScreen({ onFinish }: NoxaSplashScreenProps) {
       return;
     }
     hasStartedRef.current = true;
+    console.log('[Splash] animation started');
 
     const easeOut = Easing.out(Easing.cubic);
     animationRef.current = Animated.sequence([
@@ -106,10 +108,18 @@ export function NoxaSplashScreen({ onFinish }: NoxaSplashScreenProps) {
   }, [finishOnce, glowOpacity, glowScaleX, groupScale, lineOpacity, lineScaleX, logoOpacity, logoScale, logoTranslateY, rootOpacity, sloganOpacity, sloganTranslateY, wordOpacity, wordTranslateY]);
 
   const handleLayout = useCallback((_event: LayoutChangeEvent) => {
-    SplashScreen.hideAsync().catch(() => undefined).finally(startAnimation);
-  }, [startAnimation]);
+    onLayoutReady();
+    startAnimation();
+  }, [onLayoutReady, startAnimation]);
 
-  useEffect(() => () => animationRef.current?.stop(), []);
+  useEffect(() => {
+    const timeout = setTimeout(finishOnce, 4000);
+
+    return () => {
+      clearTimeout(timeout);
+      animationRef.current?.stop();
+    };
+  }, [finishOnce]);
 
   return (
     <Animated.View onLayout={handleLayout} style={[styles.root, { minHeight: height, opacity: rootOpacity }]}> 
