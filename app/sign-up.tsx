@@ -18,6 +18,7 @@ import {
   NoxaIconButton,
   NoxaScreen,
 } from "@/src/components/ui";
+import { supabase } from "@/src/lib/supabase";
 import { colors, radius, spacing, typography } from "@/src/theme";
 
 type SignUpErrors = {
@@ -25,6 +26,7 @@ type SignUpErrors = {
   email?: string;
   password?: string;
   confirmPassword?: string;
+  submit?: string;
 };
 
 const emailPattern = /^\S+@\S+\.\S+$/;
@@ -36,6 +38,8 @@ export default function SignUpScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<SignUpErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const validate = () => {
     const nextErrors: SignUpErrors = {};
@@ -62,9 +66,42 @@ export default function SignUpScreen() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleCreateAccount = () => {
-    if (validate()) {
-      router.replace("/(tabs)");
+  const handleCreateAccount = async () => {
+    if (isSubmitting) return;
+
+    setSuccessMessage("");
+    if (!validate()) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            display_name: displayName.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        setErrors({ submit: error.message });
+        return;
+      }
+
+      if (data.session) {
+        router.replace("/(tabs)");
+        return;
+      }
+
+      if (data.user) {
+        setSuccessMessage("Check your email to confirm your NOXA account.");
+      }
+    } catch {
+      setErrors({ submit: "Unable to create your account. Please try again." });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -105,6 +142,7 @@ export default function SignUpScreen() {
                 placeholder="Your driver name"
                 textContentType="name"
                 value={displayName}
+                editable={!isSubmitting}
               />
               <Field
                 autoCapitalize="none"
@@ -117,6 +155,7 @@ export default function SignUpScreen() {
                 placeholder="you@noxa.app"
                 textContentType="emailAddress"
                 value={email}
+                editable={!isSubmitting}
               />
               <Field
                 autoCapitalize="none"
@@ -128,6 +167,7 @@ export default function SignUpScreen() {
                 secureTextEntry={!showPassword}
                 textContentType="newPassword"
                 value={password}
+                editable={!isSubmitting}
                 rightAction={
                   <PasswordToggle
                     showPassword={showPassword}
@@ -145,6 +185,7 @@ export default function SignUpScreen() {
                 secureTextEntry={!showPassword}
                 textContentType="newPassword"
                 value={confirmPassword}
+                editable={!isSubmitting}
                 rightAction={
                   <PasswordToggle
                     showPassword={showPassword}
@@ -156,10 +197,18 @@ export default function SignUpScreen() {
               <Text style={styles.agreement}>
                 By creating an account, you agree to NOXA Terms and Privacy.
               </Text>
+              {errors.submit ? (
+                <Text style={styles.error}>{errors.submit}</Text>
+              ) : null}
+              {successMessage ? (
+                <Text style={styles.success}>{successMessage}</Text>
+              ) : null}
               <NoxaButton
                 fullWidth
                 title="Create Account"
                 onPress={handleCreateAccount}
+                disabled={isSubmitting}
+                loading={isSubmitting}
               />
             </View>
           </NoxaCard>
@@ -297,6 +346,12 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: typography.caption,
     fontWeight: "700",
+  },
+  success: {
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: "700",
+    lineHeight: typography.lineHeight.caption,
   },
   agreement: {
     color: colors.textMuted,
