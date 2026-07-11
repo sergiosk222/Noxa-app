@@ -1,50 +1,87 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, type ImageStyle } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, type ImageStyle } from 'react-native';
 
 import { NoxaAvatar, NoxaBadge, NoxaButton, NoxaCard, NoxaScreen } from '@/src/components/ui';
-import { currentUser, featuredCar } from '@/src/data';
+import { supabase } from '@/src/lib/supabase';
 import { colors, radius, shadows, spacing, typography } from '@/src/theme';
 
 type VehicleInfoRow = {
   label: string;
-  value?: string | number;
+  value?: string | number | null;
 };
 
-const vehicle = {
-  ...featuredCar,
-  displayName: 'BMW M3 G80',
-  drivetrain: 'AWD',
-  color: 'Midnight Blue',
-  transmission: '8-speed M Steptronic',
-  description: 'A focused midnight build with a clean street presence, sharpened handling, and a premium daily-driver setup ready for curated Noxa events.',
-  owner: {
-    id: currentUser.id,
-    name: currentUser.name,
-    initials: currentUser.name.slice(0, 2),
-    crew: 'Midnight Society',
-  },
-  gallery: [
-    featuredCar.imageUrl,
-    ...featuredCar.gallery,
-  ].filter(Boolean) as string[],
-  recentEvents: ['Night Run', 'Cars & Coffee', 'Drift Practice'],
-  engagement: {
-    likes: 128,
-    comments: 24,
-    mods: featuredCar.installedParts,
-    aiRecognition: 'Prepared for AI vehicle recognition',
-    visibility: featuredCar.visibility,
-  },
+type VehicleDetails = {
+  id: string;
+  owner_id: string;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  horsepower: number | null;
+  color: string | null;
+  transmission: string | null;
+  drivetrain: string | null;
+  tuning_stage: string | null;
+  zero_to_hundred: number | null;
+  description: string | null;
+  cover_image_url: string | null;
+  is_public: boolean | null;
 };
 
-const informationRows: VehicleInfoRow[] = [
-  { label: 'Brand', value: 'BMW' },
-  { label: 'Model', value: 'M3 G80' },
-  { label: 'Horsepower', value: `${vehicle.powerHp} HP` },
-  { label: 'Color', value: vehicle.color },
-  { label: 'Transmission', value: vehicle.transmission },
-].filter((row) => row.value !== undefined && row.value !== null && row.value !== '');
+type VehicleOwner = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  city: string | null;
+};
+
+const vehicleSelect = `
+  id,
+  owner_id,
+  brand,
+  model,
+  year,
+  horsepower,
+  color,
+  transmission,
+  drivetrain,
+  tuning_stage,
+  zero_to_hundred,
+  description,
+  cover_image_url,
+  is_public
+`;
+
+const ownerSelect = `
+  id,
+  display_name,
+  username,
+  avatar_url,
+  city
+`;
+
+function isPresent(value?: string | number | null) {
+  return value !== undefined && value !== null && String(value).trim() !== '';
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function getParamId(id: string | string[] | undefined) {
+  return Array.isArray(id) ? id[0] : id;
+}
+
+function formatVehicleName(vehicle: VehicleDetails) {
+  return [vehicle.brand, vehicle.model].filter(isPresent).join(' ');
+}
+
+function formatOwnerInitials(owner: VehicleOwner) {
+  const displayName = owner.display_name || owner.username || 'NX';
+  return displayName.slice(0, 2);
+}
 
 function HeaderAction({ icon, label, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress?: () => void }) {
   return (
@@ -64,44 +101,66 @@ function Header() {
   );
 }
 
-function VehicleHero() {
+function VehicleHero({ vehicle }: { vehicle: VehicleDetails }) {
+  const vehicleName = formatVehicleName(vehicle) || 'Vehicle';
+  const specs = [isPresent(vehicle.horsepower) ? `${vehicle.horsepower} HP` : null, vehicle.drivetrain, vehicle.color].filter(isPresent);
+  const content = (
+    <>
+      <View style={styles.heroTopFade} />
+      <View style={styles.heroBottomFade} />
+      <View style={styles.heroAccent} />
+      <View style={styles.heroContent}>
+        {typeof vehicle.is_public === 'boolean' ? <NoxaBadge label={vehicle.is_public ? 'PUBLIC' : 'PRIVATE'} variant="primary" /> : <View />}
+        <View>
+          <Text style={styles.heroTitle}>{vehicleName}</Text>
+          {specs.length > 0 ? (
+            <View style={styles.specRow}>
+              {specs.map((spec, index) => (
+                <View key={String(spec)} style={styles.specItem}>
+                  {index > 0 ? <View style={styles.specDot} /> : null}
+                  <Text style={styles.specText}>{spec}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      </View>
+    </>
+  );
+
   return (
     <View style={styles.heroCard}>
-      <ImageBackground source={{ uri: vehicle.imageUrl }} resizeMode="cover" style={styles.heroImage} imageStyle={styles.heroImageRadius as ImageStyle}>
-        <View style={styles.heroTopFade} />
-        <View style={styles.heroBottomFade} />
-        <View style={styles.heroAccent} />
-        <View style={styles.heroContent}>
-          <NoxaBadge label={vehicle.engagement.visibility.toUpperCase()} variant="primary" />
-          <View>
-            <Text style={styles.heroTitle}>{vehicle.displayName}</Text>
-            <View style={styles.specRow}>
-              <Text style={styles.specText}>{vehicle.powerHp} HP</Text>
-              <View style={styles.specDot} />
-              <Text style={styles.specText}>{vehicle.drivetrain}</Text>
-              <View style={styles.specDot} />
-              <Text style={styles.specText}>{vehicle.color}</Text>
-            </View>
-          </View>
+      {vehicle.cover_image_url ? (
+        <ImageBackground source={{ uri: vehicle.cover_image_url }} resizeMode="cover" style={styles.heroImage} imageStyle={styles.heroImageRadius as ImageStyle}>
+          {content}
+        </ImageBackground>
+      ) : (
+        <View style={[styles.heroImage, styles.vehiclePlaceholder]}>
+          <Ionicons name="car-sport" size={96} color="rgba(255,45,45,0.42)" />
+          {content}
         </View>
-      </ImageBackground>
+      )}
     </View>
   );
 }
 
-function OwnerCard() {
+function OwnerCard({ owner }: { owner: VehicleOwner }) {
+  const ownerName = owner.display_name || owner.username;
+  const ownerMeta = [owner.username ? `@${owner.username}` : null, owner.city].filter(isPresent).join(' • ');
+
+  if (!ownerName && !ownerMeta) {
+    return null;
+  }
+
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel="View owner profile" style={({ pressed }) => [pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel="View owner profile" onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: owner.id } })} style={({ pressed }) => [pressed && styles.pressed]}>
       <NoxaCard>
         <View style={styles.ownerRow}>
-          <NoxaAvatar initials={vehicle.owner.initials} size={52} />
+          <NoxaAvatar initials={formatOwnerInitials(owner)} size={52} />
           <View style={styles.ownerCopy}>
             <Text style={styles.eyebrow}>Owner</Text>
-            <Text style={styles.ownerName}>{vehicle.owner.name}</Text>
-          </View>
-          <View style={styles.crewBadge}>
-            <Ionicons name="shield-checkmark" size={14} color={colors.primary} />
-            <Text style={styles.crewText}>{vehicle.owner.crew}</Text>
+            {ownerName ? <Text style={styles.ownerName}>{ownerName}</Text> : null}
+            {ownerMeta ? <Text style={styles.ownerMeta}>{ownerMeta}</Text> : null}
           </View>
         </View>
       </NoxaCard>
@@ -109,27 +168,16 @@ function OwnerCard() {
   );
 }
 
-function Gallery() {
-  return (
-    <View>
-      <Text style={styles.sectionTitle}>Gallery</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
-        {vehicle.gallery.slice(0, 6).map((image, index) => (
-          <ImageBackground key={`${image}-${index}`} source={{ uri: image }} style={styles.galleryImage} imageStyle={styles.galleryRadius as ImageStyle}>
-            <View style={styles.galleryFade} />
-          </ImageBackground>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
+function Information({ rows }: { rows: VehicleInfoRow[] }) {
+  if (rows.length === 0) {
+    return null;
+  }
 
-function Information() {
   return (
     <NoxaCard>
       <Text style={styles.cardTitle}>Information</Text>
       <View style={styles.infoList}>
-        {informationRows.map((row) => (
+        {rows.map((row) => (
           <View key={row.label} style={styles.infoRow}>
             <Text style={styles.infoLabel}>{row.label}</Text>
             <Text style={styles.infoValue}>{row.value}</Text>
@@ -140,46 +188,133 @@ function Information() {
   );
 }
 
-function About() {
+function About({ description }: { description: string | null }) {
+  if (!isPresent(description)) {
+    return null;
+  }
+
   return (
     <NoxaCard>
       <Text style={styles.cardTitle}>About</Text>
-      <Text style={styles.bodyText}>{vehicle.description}</Text>
+      <Text style={styles.bodyText}>{description}</Text>
     </NoxaCard>
   );
 }
 
-function Events() {
+function StateCard({ title, message, onRetry, loading }: { title: string; message?: string; onRetry?: () => void; loading?: boolean }) {
   return (
     <NoxaCard>
-      <Text style={styles.cardTitle}>Recent Events</Text>
-      <View style={styles.eventList}>
-        {vehicle.recentEvents.map((event) => (
-          <View key={event} style={styles.eventRow}>
-            <Ionicons name="calendar-clear-outline" size={18} color={colors.primary} />
-            <Text style={styles.eventText}>{event}</Text>
-          </View>
-        ))}
+      <View style={styles.stateCard}>
+        {loading ? <ActivityIndicator color={colors.primary} /> : null}
+        <Text style={styles.stateTitle}>{title}</Text>
+        {message ? <Text style={styles.stateText}>{message}</Text> : null}
+        {onRetry ? (
+          <Pressable accessibilityRole="button" onPress={onRetry} style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}>
+            <Text style={styles.retryText}>Retry</Text>
+          </Pressable>
+        ) : null}
       </View>
     </NoxaCard>
   );
 }
 
 export default function VehicleDetailsScreen() {
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const vehicleId = getParamId(id);
+  const [vehicle, setVehicle] = useState<VehicleDetails | null>(null);
+  const [owner, setOwner] = useState<VehicleOwner | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const informationRows = useMemo<VehicleInfoRow[]>(() => {
+    if (!vehicle) {
+      return [];
+    }
+
+    return [
+      { label: 'Brand', value: vehicle.brand },
+      { label: 'Model', value: vehicle.model },
+      { label: 'Year', value: vehicle.year },
+      { label: 'Horsepower', value: isPresent(vehicle.horsepower) ? `${vehicle.horsepower} HP` : null },
+      { label: 'Color', value: vehicle.color },
+      { label: 'Transmission', value: vehicle.transmission },
+      { label: 'Drivetrain', value: vehicle.drivetrain },
+      { label: 'Tuning Stage', value: vehicle.tuning_stage },
+      { label: '0–100 km/h', value: isPresent(vehicle.zero_to_hundred) ? `${vehicle.zero_to_hundred}s` : null },
+    ].filter((row) => isPresent(row.value));
+  }, [vehicle]);
+
+  const loadVehicle = useCallback(async () => {
+    if (!isPresent(vehicleId)) {
+      setVehicle(null);
+      setOwner(null);
+      setError('Missing vehicle id.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!isUuid(vehicleId)) {
+      setVehicle(null);
+      setOwner(null);
+      setError('Invalid vehicle id.');
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    const { data: vehicleData, error: vehicleError } = await supabase.from('vehicles').select(vehicleSelect).eq('id', vehicleId).maybeSingle();
+
+    if (vehicleError || !vehicleData) {
+      setVehicle(null);
+      setOwner(null);
+      setError('Unable to load vehicle.');
+      setIsLoading(false);
+      return;
+    }
+
+    const loadedVehicle = vehicleData as VehicleDetails;
+    setVehicle(loadedVehicle);
+
+    const { data: ownerData, error: ownerError } = await supabase.from('profiles').select(ownerSelect).eq('id', loadedVehicle.owner_id).maybeSingle();
+
+    if (ownerError) {
+      setOwner(null);
+      setError('Vehicle loaded, but owner details are unavailable.');
+    } else {
+      setOwner((ownerData as VehicleOwner | null) ?? null);
+    }
+
+    setIsLoading(false);
+  }, [vehicleId]);
+
+  useEffect(() => {
+    void loadVehicle();
+  }, [loadVehicle]);
+
+  const showCta = Boolean(vehicle?.owner_id);
+
   return (
     <NoxaScreen padded={false}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <Header />
-        <VehicleHero />
-        <OwnerCard />
-        <Gallery />
-        <Information />
-        <About />
-        <Events />
+        {isLoading ? <StateCard loading title="Loading vehicle..." /> : null}
+        {!isLoading && error ? <StateCard title={error} onRetry={loadVehicle} /> : null}
+        {!isLoading && !error && vehicle ? (
+          <>
+            <VehicleHero vehicle={vehicle} />
+            {owner ? <OwnerCard owner={owner} /> : null}
+            <Information rows={informationRows} />
+            <About description={vehicle.description} />
+          </>
+        ) : null}
       </ScrollView>
-      <View style={styles.ctaWrap} pointerEvents="box-none">
-        <NoxaButton title="View Owner" fullWidth onPress={() => router.push(`/driver-profile/${vehicle.owner.id}`)} />
-      </View>
+      {showCta ? (
+        <View style={styles.ctaWrap} pointerEvents="box-none">
+          <NoxaButton title="View Owner" fullWidth onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: vehicle?.owner_id } })} />
+        </View>
+      ) : null}
     </NoxaScreen>
   );
 }
@@ -193,33 +328,31 @@ const styles = StyleSheet.create({
   heroCard: { height: 430, overflow: 'hidden', borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, ...shadows.card },
   heroImage: { flex: 1 },
   heroImageRadius: { borderRadius: radius.card },
+  vehiclePlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceSoft },
   heroTopFade: { ...StyleSheet.absoluteFillObject, bottom: undefined, height: 150, backgroundColor: 'rgba(0,0,0,0.32)' },
   heroBottomFade: { ...StyleSheet.absoluteFillObject, top: undefined, height: 245, backgroundColor: 'rgba(0,0,0,0.66)' },
   heroAccent: { position: 'absolute', right: -70, bottom: -76, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(255,45,45,0.20)' },
-  heroContent: { flex: 1, justifyContent: 'space-between', padding: spacing.xl },
+  heroContent: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: spacing.xl },
   heroTitle: { color: colors.text, fontSize: 38, fontWeight: '900', letterSpacing: -1.2 },
   specRow: { marginTop: spacing.sm, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
+  specItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   specText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
   specDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.primary },
   ownerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   ownerCopy: { flex: 1 },
   eyebrow: { color: colors.textMuted, fontSize: 11, fontWeight: '900', letterSpacing: 1.3, textTransform: 'uppercase' },
   ownerName: { marginTop: spacing.xxs, color: colors.text, fontSize: typography.cardTitle, fontWeight: '900' },
-  crewBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.border },
-  crewText: { color: colors.text, fontSize: 11, fontWeight: '900' },
-  sectionTitle: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
-  galleryRow: { gap: spacing.sm, paddingTop: spacing.md, paddingRight: spacing.lg },
-  galleryImage: { width: 150, height: 126, overflow: 'hidden', borderRadius: radius.lg, backgroundColor: colors.surfaceSoft },
-  galleryRadius: { borderRadius: radius.lg },
-  galleryFade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.10)', borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg },
+  ownerMeta: { marginTop: spacing.xxs, color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
   cardTitle: { color: colors.text, fontSize: typography.body, fontWeight: '900' },
   infoList: { marginTop: spacing.md, gap: spacing.md },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '800' },
   infoValue: { flex: 1, color: colors.text, fontSize: typography.body, fontWeight: '800', textAlign: 'right' },
   bodyText: { marginTop: spacing.md, color: colors.textMuted, fontSize: typography.body, fontWeight: '600', lineHeight: 24 },
-  eventList: { marginTop: spacing.md, gap: spacing.sm },
-  eventRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.border },
-  eventText: { color: colors.text, fontSize: typography.body, fontWeight: '800' },
+  stateCard: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md },
+  stateTitle: { color: colors.text, fontSize: typography.body, fontWeight: '900', textAlign: 'center' },
+  stateText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700', textAlign: 'center' },
+  retryButton: { marginTop: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.border },
+  retryText: { color: colors.text, fontSize: typography.caption, fontWeight: '900' },
   ctaWrap: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg },
 });
