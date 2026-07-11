@@ -211,6 +211,8 @@ function buildVehicleStats(vehicle: GarageVehicle) {
 }
 
 function StatsCard({ vehicle }: { vehicle: GarageVehicle | null }) {
+  const entryAnimationStyle = useEntryAnimation(80);
+
   if (!vehicle) {
     return null;
   }
@@ -218,7 +220,7 @@ function StatsCard({ vehicle }: { vehicle: GarageVehicle | null }) {
   const stats = buildVehicleStats(vehicle);
 
   return (
-    <Animated.View style={useEntryAnimation(80)}>
+    <Animated.View style={entryAnimationStyle}>
       <View style={styles.statsGrid}>
         {stats.map((stat) => (
           <NoxaCard key={stat.label} style={styles.statCard}>
