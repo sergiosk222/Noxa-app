@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Pressable,
   ScrollView,
@@ -19,6 +20,7 @@ import {
   NoxaScreen,
 } from "@/src/components/ui";
 import { currentUser } from "@/src/data";
+import { supabase } from "@/src/lib/supabase";
 import { animations, colors, radius, spacing, typography } from "@/src/theme";
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -240,6 +242,51 @@ function QuickActionsCard() {
 }
 
 export default function ProfileScreen() {
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const signOut = async () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+
+    const { error } = await supabase.auth.signOut({
+      scope: "local",
+    });
+
+    setIsSigningOut(false);
+
+    if (error) {
+      Alert.alert(
+        "Logout failed",
+        "We couldn't log you out. Please try again.",
+      );
+      return;
+    }
+
+    router.replace("/welcome");
+  };
+
+  const confirmSignOut = () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    Alert.alert(
+      "Log out of NOXA?",
+      "You will need to sign in again on this device.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: signOut,
+        },
+      ],
+    );
+  };
+
   return (
     <NoxaScreen padded={false}>
       <ScrollView
@@ -253,6 +300,22 @@ export default function ProfileScreen() {
         <RecentActivityCard />
         <QuickActionsCard />
         <NoxaButton title="Edit Profile" fullWidth />
+        <View style={styles.logoutWrap}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isSigningOut}
+            onPress={confirmSignOut}
+            style={({ pressed }) => [
+              styles.logoutButton,
+              pressed && !isSigningOut && styles.pressed,
+              isSigningOut && styles.logoutButtonDisabled,
+            ]}
+          >
+            <Text style={styles.logoutText}>
+              {isSigningOut ? "Logging out…" : "Log Out"}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </NoxaScreen>
   );
@@ -434,5 +497,29 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "800",
+  },
+  logoutWrap: {
+    alignItems: "center",
+    marginTop: spacing.xs,
+  },
+  logoutButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.button,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.45,
+  },
+  logoutText: {
+    color: colors.primary,
+    fontSize: typography.caption,
+    fontWeight: "900",
+    letterSpacing: typography.letterSpacing.caption,
+    textTransform: "uppercase",
   },
 });
