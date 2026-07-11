@@ -51,13 +51,6 @@ const car = {
   buildName: featuredCar.buildName,
   status: featuredCar.visibility.toUpperCase(),
   image: featuredCar.imageUrl,
-  stats: [
-    { label: 'HP', value: String(featuredCar.powerHp) },
-    { label: 'Torque', value: `${featuredCar.torqueNm} Nm` },
-    { label: '0-100', value: `${featuredCar.zeroToHundred} s` },
-    { label: 'Stage', value: featuredCar.stage },
-  ],
-  buildCompletion: featuredCar.buildProgress,
   installedParts: featuredCar.installedParts,
   gallery: featuredCar.gallery,
   activity: {
@@ -194,33 +187,35 @@ function VehicleCollection({ error, isLoading, onRetry, vehicles }: { error: boo
   );
 }
 
-function StatsCard() {
+function buildVehicleStats(vehicle: GarageVehicle) {
+  return [
+    { label: 'HP', value: `${vehicle.horsepower} HP` },
+    { label: 'Year', value: vehicle.year !== null ? String(vehicle.year) : null },
+    { label: 'Transmission', value: vehicle.transmission },
+    { label: 'Drivetrain', value: vehicle.drivetrain },
+    { label: 'Stage', value: vehicle.tuning_stage },
+    { label: '0-100', value: vehicle.zero_to_hundred !== null ? `${vehicle.zero_to_hundred} s` : null },
+    { label: 'Visibility', value: vehicle.is_public ? 'PUBLIC' : 'PRIVATE' },
+  ].filter((stat): stat is { label: string; value: string } => stat.value !== null && stat.value !== undefined && stat.value !== '');
+}
+
+function StatsCard({ vehicle }: { vehicle: GarageVehicle | null }) {
+  if (!vehicle) {
+    return null;
+  }
+
+  const stats = buildVehicleStats(vehicle);
+
   return (
     <Animated.View style={useEntryAnimation(80)}>
       <View style={styles.statsGrid}>
-        {car.stats.map((stat) => (
-          <NoxaCard key={stat.label}>
+        {stats.map((stat) => (
+          <NoxaCard key={stat.label} style={styles.statCard}>
             <Text style={styles.statValue}>{stat.value}</Text>
             <Text style={styles.statLabel}>{stat.label}</Text>
           </NoxaCard>
         ))}
       </View>
-    </Animated.View>
-  );
-}
-
-function BuildProgressCard() {
-  return (
-    <Animated.View style={useEntryAnimation(140)}>
-      <NoxaCard>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Build Completion</Text>
-          <Text style={styles.percent}>{car.buildCompletion}%</Text>
-        </View>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${car.buildCompletion}%` }]} />
-        </View>
-      </NoxaCard>
     </Animated.View>
   );
 }
@@ -288,6 +283,7 @@ export default function GarageScreen() {
   const [vehicles, setVehicles] = useState<GarageVehicle[]>([]);
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
   const [hasVehicleError, setHasVehicleError] = useState(false);
+  const selectedVehicle = vehicles[0] ?? null;
 
   const loadVehicles = useCallback(async () => {
     setIsLoadingVehicles(true);
@@ -338,8 +334,7 @@ export default function GarageScreen() {
           }
         />
         <VehicleCollection error={hasVehicleError} isLoading={isLoadingVehicles} onRetry={loadVehicles} vehicles={vehicles} />
-        <StatsCard />
-        <BuildProgressCard />
+        <StatsCard vehicle={selectedVehicle} />
         <InstalledPartsCard />
         <GalleryCard />
         <ActivityCard />
@@ -456,6 +451,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  statCard: {
+    flexGrow: 1,
+    flexBasis: 148,
+  },
   statValue: {
     minWidth: 116,
     color: colors.text,
@@ -480,23 +479,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.body,
     fontWeight: '900',
-  },
-  percent: {
-    color: colors.primary,
-    fontSize: typography.body,
-    fontWeight: '900',
-  },
-  progressTrack: {
-    height: 10,
-    marginTop: spacing.md,
-    overflow: 'hidden',
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceSoft,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
   },
   partsList: {
     marginTop: spacing.md,
