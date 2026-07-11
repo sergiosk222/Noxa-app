@@ -187,16 +187,27 @@ function VehicleCollection({ error, isLoading, onRetry, vehicles }: { error: boo
   );
 }
 
+type VehicleStat = {
+  label: string;
+  value: string | null;
+};
+
+function hasStatValue(stat: VehicleStat): stat is { label: string; value: string } {
+  return stat.value !== null && stat.value.trim() !== '';
+}
+
 function buildVehicleStats(vehicle: GarageVehicle) {
-  return [
-    { label: 'HP', value: `${vehicle.horsepower} HP` },
+  const stats: VehicleStat[] = [
+    { label: 'Horsepower', value: `${vehicle.horsepower} HP` },
     { label: 'Year', value: vehicle.year !== null ? String(vehicle.year) : null },
     { label: 'Transmission', value: vehicle.transmission },
     { label: 'Drivetrain', value: vehicle.drivetrain },
     { label: 'Stage', value: vehicle.tuning_stage },
     { label: '0-100', value: vehicle.zero_to_hundred !== null ? `${vehicle.zero_to_hundred} s` : null },
     { label: 'Visibility', value: vehicle.is_public ? 'PUBLIC' : 'PRIVATE' },
-  ].filter((stat): stat is { label: string; value: string } => stat.value !== null && stat.value !== undefined && stat.value !== '');
+  ];
+
+  return stats.filter(hasStatValue);
 }
 
 function StatsCard({ vehicle }: { vehicle: GarageVehicle | null }) {
