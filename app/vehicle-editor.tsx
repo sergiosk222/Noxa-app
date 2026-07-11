@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { NoxaButton, NoxaCard, NoxaHeader, NoxaInput, NoxaScreen } from '@/src/components/ui';
 import { supabase } from '@/src/lib/supabase';
@@ -13,6 +14,10 @@ const colorsAvailable = [
   { name: 'Racing Red', value: colors.primary },
   { name: 'Midnight', value: '#050608' },
 ];
+
+const vehicleImagesBucket = 'vehicle-images';
+const maxCoverImageBytes = 6 * 1024 * 1024;
+const supportedCoverMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'] as const;
 
 type VehicleForm = {
   brand: string;
@@ -60,6 +65,11 @@ type NormalizedVehicle = {
   description: string | null;
   cover_image_url: string | null;
   is_public: boolean;
+};
+
+type UploadedCoverImage = {
+  path: string;
+  publicUrl: string;
 };
 
 const initialForm: VehicleForm = {
@@ -117,8 +127,6 @@ function validateForm(form: VehicleForm): { errors: VehicleErrors; values?: Norm
   const tuningStage = optionalText(form.tuningStage);
   const zeroToHundred = parseOptionalNumber(form.zeroToHundred);
   const description = optionalText(form.description);
-  const coverImageUrl = optionalText(form.coverImageUrl);
-
   if (!brand) {
     errors.brand = 'Brand is required.';
   } else if (brand.length > 60) {
@@ -167,10 +175,6 @@ function validateForm(form: VehicleForm): { errors: VehicleErrors; values?: Norm
     errors.description = 'Description must be 1000 characters or less.';
   }
 
-  if (coverImageUrl && coverImageUrl.length > 2048) {
-    errors.coverImageUrl = 'Cover image URL must be 2048 characters or less.';
-  }
-
   if (Object.keys(errors).length > 0 || horsepower === null || Number.isNaN(horsepower)) {
     return { errors };
   }
@@ -188,10 +192,49 @@ function validateForm(form: VehicleForm): { errors: VehicleErrors; values?: Norm
       tuning_stage: tuningStage,
       zero_to_hundred: Number.isNaN(zeroToHundred) ? null : zeroToHundred,
       description,
-      cover_image_url: coverImageUrl,
+      cover_image_url: null,
       is_public: form.isPublic,
     },
   };
+}
+
+function normalizeMimeType(mimeType?: string | null) {
+  return mimeType?.toLowerCase() === 'image/jpg' ? 'image/jpeg' : mimeType?.toLowerCase();
+}
+
+function getSafeExtension(asset: ImagePicker.ImagePickerAsset, contentType: string) {
+  const fromFileName = asset.fileName?.split('.').pop()?.toLowerCase();
+  const fromUri = asset.uri.split('?')[0]?.split('.').pop()?.toLowerCase();
+  const candidate = fromFileName || fromUri;
+
+  if (candidate && ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(candidate)) {
+    return candidate === 'jpg' ? 'jpeg' : candidate;
+  }
+
+  return contentType.split('/')[1] ?? 'jpeg';
+}
+
+function getPreviousOwnedVehicleImagePath(publicUrl: string | null, userId: string) {
+  if (!publicUrl) {
+    return null;
+  }
+
+  try {
+    const url = new URL(publicUrl);
+    const marker = `/storage/v1/object/public/${vehicleImagesBucket}/`;
+    const markerIndex = url.pathname.indexOf(marker);
+
+    if (markerIndex === -1) {
+      return null;
+    }
+
+    const path = decodeURIComponent(url.pathname.slice(markerIndex + marker.length));
+    const [ownerFolder] = path.split('/');
+
+    return ownerFolder === userId ? path : null;
+  } catch {
+    return null;
+  }
 }
 
 function getSaveErrorMessage(error: { message?: string } | unknown) {
@@ -270,6 +313,53 @@ function GalleryPlaceholder() {
   );
 }
 
+function CoverImagePicker({
+  disabled,
+  isBusy,
+  onChoose,
+  onRemove,
+  previewUri,
+}: {
+  disabled: boolean;
+  isBusy: boolean;
+  onChoose: () => void;
+  onRemove: () => void;
+  previewUri: string | null;
+}) {
+  const hasImage = Boolean(previewUri);
+
+  return (
+    <View style={styles.fieldGroup}>
+      <View style={styles.galleryHeader}>
+        <Text style={styles.label}>Cover image</Text>
+        {isBusy ? <Text style={styles.futureNote}>Uploading...</Text> : null}
+      </View>
+      <View style={styles.coverPreview}>
+        {previewUri ? (
+          <Image source={{ uri: previewUri }} style={styles.coverPreviewImage} />
+        ) : (
+          <View style={styles.coverPlaceholder}>
+            <Ionicons name="car-sport" size={30} color={colors.primary} />
+            <Text style={styles.coverPlaceholderText}>Premium cover placeholder</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.coverActions}>
+        <Pressable accessibilityRole="button" disabled={disabled} onPress={onChoose} style={({ pressed }) => [styles.coverActionButton, pressed && styles.pressed, disabled && styles.disabled]}>
+          <Ionicons name="image" size={16} color={colors.text} />
+          <Text style={styles.coverActionText}>{hasImage ? 'Change Cover' : 'Choose Cover'}</Text>
+        </Pressable>
+        {hasImage ? (
+          <Pressable accessibilityRole="button" disabled={disabled} onPress={onRemove} style={({ pressed }) => [styles.coverActionButton, styles.coverRemoveButton, pressed && styles.pressed, disabled && styles.disabled]}>
+            <Ionicons name="trash-outline" size={16} color={colors.primary} />
+            <Text style={[styles.coverActionText, styles.coverRemoveText]}>Remove Cover</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 function formFromVehicle(vehicle: VehicleRecord): VehicleForm {
   return {
     brand: vehicle.brand ?? '',
@@ -309,10 +399,103 @@ export default function VehicleEditorScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingVehicle, setIsLoadingVehicle] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedCoverAsset, setSelectedCoverAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [isCoverRemoved, setIsCoverRemoved] = useState(false);
 
   const setField = (field: keyof VehicleForm, value: string | boolean) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined, form: undefined }));
+  };
+
+  const coverPreviewUri = selectedCoverAsset?.uri ?? (!isCoverRemoved && form.coverImageUrl ? form.coverImageUrl : null);
+
+  const chooseCoverImage = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Photo access needed', 'Allow photo library access to choose a vehicle cover. You can still save the vehicle without a cover image.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.78,
+      exif: false,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const [asset] = result.assets;
+
+    if (asset) {
+      setSelectedCoverAsset(asset);
+      setIsCoverRemoved(false);
+      setErrors((current) => ({ ...current, coverImageUrl: undefined, form: undefined }));
+    }
+  };
+
+  const removeCoverImage = () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setSelectedCoverAsset(null);
+    setIsCoverRemoved(true);
+    setErrors((current) => ({ ...current, coverImageUrl: undefined, form: undefined }));
+  };
+
+  const uploadCoverImage = async (asset: ImagePicker.ImagePickerAsset, userId: string): Promise<UploadedCoverImage> => {
+    const contentType = normalizeMimeType(asset.mimeType);
+
+    if (!contentType || !supportedCoverMimeTypes.includes(contentType as (typeof supportedCoverMimeTypes)[number])) {
+      throw new Error('Please choose a JPEG, PNG, WEBP, HEIC, or HEIF image.');
+    }
+
+    const arrayBuffer = await fetch(asset.uri).then((response) => response.arrayBuffer());
+
+    if (arrayBuffer.byteLength > maxCoverImageBytes) {
+      throw new Error('Please choose an image smaller than 6 MB.');
+    }
+
+    const extension = getSafeExtension(asset, contentType);
+    const randomSuffix = Math.random().toString(36).slice(2, 10);
+    const path = `${userId}/${Date.now()}-${randomSuffix}.${extension}`;
+    const { error: uploadError } = await supabase.storage.from(vehicleImagesBucket).upload(path, arrayBuffer, {
+      contentType,
+      cacheControl: '3600',
+      upsert: false,
+    });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from(vehicleImagesBucket).getPublicUrl(path);
+
+    return { path, publicUrl: data.publicUrl };
+  };
+
+  const removeOwnedCoverImage = async (publicUrl: string | null, userId: string) => {
+    const path = getPreviousOwnedVehicleImagePath(publicUrl, userId);
+
+    if (!path) {
+      return;
+    }
+
+    const { error } = await supabase.storage.from(vehicleImagesBucket).remove([path]);
+
+    if (error) {
+      console.warn('Unable to clean up previous vehicle cover image.', error.message);
+    }
   };
 
 
@@ -356,6 +539,8 @@ export default function VehicleEditorScreen() {
     }
 
     setForm(formFromVehicle(vehicle as VehicleRecord));
+    setSelectedCoverAsset(null);
+    setIsCoverRemoved(false);
     setIsLoadingVehicle(false);
   }, [vehicleId]);
 
@@ -395,6 +580,18 @@ export default function VehicleEditorScreen() {
         return;
       }
 
+      let uploadedCoverImage: UploadedCoverImage | null = null;
+      let coverImageUrl = isEditMode ? validation.values.cover_image_url : null;
+
+      if (selectedCoverAsset) {
+        uploadedCoverImage = await uploadCoverImage(selectedCoverAsset, user.id);
+        coverImageUrl = uploadedCoverImage.publicUrl;
+      } else if (isEditMode && !isCoverRemoved) {
+        coverImageUrl = form.coverImageUrl || null;
+      } else {
+        coverImageUrl = null;
+      }
+
       const vehiclePayload = {
         brand: validation.values.brand,
         model: validation.values.model,
@@ -406,25 +603,38 @@ export default function VehicleEditorScreen() {
         tuning_stage: validation.values.tuning_stage,
         zero_to_hundred: validation.values.zero_to_hundred,
         description: validation.values.description,
-        cover_image_url: validation.values.cover_image_url,
+        cover_image_url: coverImageUrl,
         is_public: validation.values.is_public,
       };
 
       if (isEditMode && vehicleId) {
         const { data: updatedVehicle, error: updateError } = await supabase.from('vehicles').update(vehiclePayload).eq('id', vehicleId).eq('owner_id', user.id).select('id').maybeSingle();
 
-        setIsSubmitting(false);
-
         if (updateError) {
+          if (uploadedCoverImage) {
+            await supabase.storage.from(vehicleImagesBucket).remove([uploadedCoverImage.path]);
+          }
+
+          setIsSubmitting(false);
           setErrors({ form: getSaveErrorMessage(updateError) });
           return;
         }
 
         if (!updatedVehicle) {
+          if (uploadedCoverImage) {
+            await supabase.storage.from(vehicleImagesBucket).remove([uploadedCoverImage.path]);
+          }
+
+          setIsSubmitting(false);
           setErrors({ form: 'Vehicle not found or you do not have permission to edit it.' });
           return;
         }
 
+        if (isCoverRemoved || uploadedCoverImage) {
+          await removeOwnedCoverImage(form.coverImageUrl, user.id);
+        }
+
+        setIsSubmitting(false);
         router.replace({ pathname: '/vehicle-details', params: { id: vehicleId } });
         return;
       }
@@ -438,12 +648,17 @@ export default function VehicleEditorScreen() {
         .select('id')
         .single();
 
-      setIsSubmitting(false);
-
       if (insertError) {
+        if (uploadedCoverImage) {
+          await supabase.storage.from(vehicleImagesBucket).remove([uploadedCoverImage.path]);
+        }
+
+        setIsSubmitting(false);
         setErrors({ form: getSaveErrorMessage(insertError) });
         return;
       }
+
+      setIsSubmitting(false);
 
       if (vehicle?.id) {
         router.back();
@@ -503,7 +718,7 @@ export default function VehicleEditorScreen() {
             <ColorSelector disabled={isSubmitting} error={errors.color} onSelect={(value) => setField('color', value)} selectedColor={form.color} />
             <GalleryPlaceholder />
             <FieldError message={errors.coverImageUrl}>
-              <NoxaInput editable={!isSubmitting} label="Cover image URL" maxLength={2049} onChangeText={(value) => setField('coverImageUrl', value)} placeholder="https://..." value={form.coverImageUrl} autoCapitalize="none" />
+              <CoverImagePicker disabled={isSubmitting} isBusy={isSubmitting && Boolean(selectedCoverAsset)} onChoose={chooseCoverImage} onRemove={removeCoverImage} previewUri={coverPreviewUri} />
             </FieldError>
           </FormSection>
 
@@ -543,7 +758,7 @@ export default function VehicleEditorScreen() {
           </FormSection>
 
           <View style={styles.actions}>
-            <NoxaButton disabled={isSubmitting} loading={isSubmitting} onPress={saveVehicle} title={isEditMode ? 'SAVE CHANGES' : 'Save Vehicle'} fullWidth />
+            <NoxaButton disabled={isSubmitting} loading={isSubmitting} onPress={saveVehicle} title={isSubmitting && selectedCoverAsset ? 'Uploading...' : isEditMode ? 'SAVE CHANGES' : 'Save Vehicle'} fullWidth />
             <NoxaButton disabled={isSubmitting} title="Cancel" variant="secondary" fullWidth onPress={() => router.back()} />
           </View>
         </ScrollView>
@@ -705,6 +920,59 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: '800',
+  },
+  coverPreview: {
+    aspectRatio: 16 / 9,
+    overflow: 'hidden',
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  coverPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  coverPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: '#090A0E',
+    borderWidth: 1,
+    borderColor: 'rgba(255,45,45,0.2)',
+  },
+  coverPlaceholderText: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: '800',
+  },
+  coverActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  coverActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  coverRemoveButton: {
+    borderColor: 'rgba(255,45,45,0.36)',
+  },
+  coverActionText: {
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: '900',
+  },
+  coverRemoveText: {
+    color: colors.primary,
   },
   textArea: {
     minHeight: 118,
