@@ -247,15 +247,7 @@ export default function VehicleDetailsScreen() {
   }, [vehicle]);
 
   const loadVehicle = useCallback(async () => {
-    if (!isPresent(vehicleId)) {
-      setVehicle(null);
-      setOwner(null);
-      setError('Missing vehicle id.');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!isUuid(vehicleId)) {
+    if (!vehicleId || !isUuid(vehicleId)) {
       setVehicle(null);
       setOwner(null);
       setError('Invalid vehicle id.');
@@ -355,7 +347,7 @@ export default function VehicleDetailsScreen() {
   }, [deleteVehicle, isDeleting]);
 
   const ownsVehicle = Boolean(vehicle && currentUserId && currentUserId === vehicle.owner_id);
-  const showCta = Boolean(vehicle?.owner_id);
+  const ctaVehicle = vehicle?.owner_id ? vehicle : null;
 
   return (
     <NoxaScreen padded={false}>
@@ -372,11 +364,11 @@ export default function VehicleDetailsScreen() {
           </>
         ) : null}
       </ScrollView>
-      {showCta ? (
+      {ctaVehicle ? (
         <View style={styles.ctaWrap} pointerEvents="box-none">
-          {ownsVehicle ? <NoxaButton title="Edit Vehicle" fullWidth onPress={() => router.push({ pathname: '/vehicle-editor', params: { id: vehicle?.id } })} /> : null}
+          {ownsVehicle ? <NoxaButton title="Edit Vehicle" fullWidth onPress={() => router.push({ pathname: '/vehicle-editor', params: { id: ctaVehicle.id } })} /> : null}
           {ownsVehicle ? <NoxaButton title={isDeleting ? 'Deleting...' : 'Delete Vehicle'} fullWidth variant="danger" disabled={isDeleting} onPress={confirmDeleteVehicle} /> : null}
-          <NoxaButton title="View Owner" fullWidth variant={ownsVehicle ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: vehicle?.owner_id } })} />
+          <NoxaButton title="View Owner" fullWidth variant={ownsVehicle ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: ctaVehicle.owner_id } })} />
         </View>
       ) : null}
     </NoxaScreen>
