@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, type Href } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +25,15 @@ import { supabase } from "@/src/lib/supabase";
 import { animations, colors, radius, spacing, typography } from "@/src/theme";
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
+
+type CurrentUserProfile = {
+  id: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  city: string | null;
+};
 
 type ProfileStat = {
   label: string;
@@ -104,7 +114,28 @@ function SettingsButton() {
   );
 }
 
-function ProfileHero() {
+type ProfileHeroProps = {
+  profileData: CurrentUserProfile | null;
+  isLoading: boolean;
+  errorMessage: string | null;
+  onRetry: () => void;
+};
+
+function getProfileInitials(displayName: string) {
+  return displayName
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2);
+}
+
+function ProfileHero({
+  profileData,
+  isLoading,
+  errorMessage,
+  onRetry,
+}: ProfileHeroProps) {
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.97)).current;
 
@@ -123,25 +154,58 @@ function ProfileHero() {
     ]).start();
   }, [opacity, scale]);
 
+  const displayName = profileData?.display_name ?? profile.name;
+  const username = profileData?.username ?? "Add username";
+  const bio = profileData?.bio ?? "Tell the community about yourself.";
+  const city = profileData?.city ?? "Add city";
+  const avatarUrl = profileData?.avatar_url;
+
   return (
     <Animated.View style={[styles.hero, { opacity, transform: [{ scale }] }]}>
       <View style={styles.avatarRing}>
-        <NoxaAvatar initials="SN" size={108} />
+        {avatarUrl ? (
+          <Image
+            source={{ uri: avatarUrl }}
+            style={styles.avatarImage}
+            accessibilityLabel={`${displayName} avatar`}
+          />
+        ) : (
+          <NoxaAvatar initials={getProfileInitials(displayName)} size={108} />
+        )}
       </View>
       <View style={styles.identityBlock}>
+        {isLoading ? (
+          <Text style={styles.identityMeta}>Loading profile…</Text>
+        ) : null}
         <View style={styles.nameRow}>
-          <Text style={styles.name}>{profile.name}</Text>
+          <Text style={styles.name}>{displayName}</Text>
           <NoxaBadge label={profile.status} variant="success" />
         </View>
-        <Text style={styles.username}>{profile.username}</Text>
+        <Text style={styles.username}>{username}</Text>
+        <Text style={styles.bio}>{bio}</Text>
         <View style={styles.locationRow}>
           <Ionicons
             name="location-outline"
             size={16}
             color={colors.textMuted}
           />
-          <Text style={styles.location}>{profile.location}</Text>
+          <Text style={styles.location}>{city}</Text>
         </View>
+        {errorMessage ? (
+          <View style={styles.inlineErrorRow}>
+            <Text style={styles.inlineError}>{errorMessage}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onRetry}
+              style={({ pressed }) => [
+                styles.retryButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </Animated.View>
   );
@@ -243,6 +307,46 @@ function QuickActionsCard() {
 
 export default function ProfileScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [profileData, setProfileData] = useState<CurrentUserProfile | null>(
+    null,
+  );
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  const loadProfile = useCallback(async () => {
+    setIsProfileLoading(true);
+    setProfileError(null);
+
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData.user;
+
+    if (!user) {
+      setProfileData(null);
+      setProfileError("Sign in to load profile.");
+      setIsProfileLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, display_name, username, avatar_url, bio, city")
+      .eq("id", user.id)
+      .single();
+
+    if (error) {
+      setProfileData(null);
+      setProfileError("Unable to load profile.");
+      setIsProfileLoading(false);
+      return;
+    }
+
+    setProfileData(data);
+    setIsProfileLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
 
   const signOut = async () => {
     if (isSigningOut) {
@@ -294,7 +398,12 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
       >
         <NoxaHeader title="PROFILE" right={<SettingsButton />} />
-        <ProfileHero />
+        <ProfileHero
+          profileData={profileData}
+          isLoading={isProfileLoading}
+          errorMessage={profileError}
+          onRetry={loadProfile}
+        />
         <StatsGrid />
         <AchievementsCard />
         <RecentActivityCard />
@@ -350,6 +459,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  avatarImage: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+  },
   avatarRing: {
     padding: spacing.xs,
     borderRadius: radius.pill,
@@ -374,15 +488,51 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -0.8,
   },
+  identityMeta: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: "800",
+  },
   username: {
     color: colors.textMuted,
     fontSize: typography.body,
     fontWeight: "700",
   },
+  bio: {
+    maxWidth: 280,
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: "700",
+    lineHeight: 18,
+    textAlign: "center",
+  },
   locationRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xxs,
+  },
+  inlineErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  inlineError: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: "800",
+  },
+  retryButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+  },
+  retryText: {
+    color: colors.primary,
+    fontSize: typography.caption,
+    fontWeight: "900",
   },
   location: {
     color: colors.textMuted,
