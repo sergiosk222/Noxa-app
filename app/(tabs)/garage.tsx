@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, type ImageStyle } from 'react-native';
 
 import { NoxaBadge, NoxaButton, NoxaCard, NoxaHeader, NoxaScreen } from '@/src/components/ui';
-import { featuredCar } from '@/src/data';
 import { supabase } from '@/src/lib/supabase';
 import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
@@ -45,20 +44,6 @@ const vehicleSelect = `
   created_at,
   updated_at
 `;
-
-const car = {
-  model: featuredCar.name,
-  buildName: featuredCar.buildName,
-  status: featuredCar.visibility.toUpperCase(),
-  image: featuredCar.imageUrl,
-  installedParts: featuredCar.installedParts,
-  gallery: featuredCar.gallery,
-  activity: {
-    event: 'Night Run',
-    date: 'Yesterday',
-    crew: 'Midnight Society',
-  },
-};
 
 function useEntryAnimation(delay = 0) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -233,65 +218,6 @@ function StatsCard({ vehicle }: { vehicle: GarageVehicle | null }) {
   );
 }
 
-function InstalledPartsCard() {
-  return (
-    <Animated.View style={useEntryAnimation(200)}>
-      <NoxaCard>
-        <Text style={styles.sectionTitle}>Installed Parts</Text>
-        <View style={styles.partsList}>
-          {car.installedParts.map((part) => (
-            <View key={part} style={styles.partRow}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-              <Text style={styles.partText}>{part}</Text>
-            </View>
-          ))}
-        </View>
-      </NoxaCard>
-    </Animated.View>
-  );
-}
-
-function GalleryCard() {
-  return (
-    <Animated.View style={useEntryAnimation(260)}>
-      <NoxaCard>
-        <View style={styles.rowBetween}>
-          <Text style={styles.sectionTitle}>Gallery</Text>
-          <Text style={styles.viewAll}>View All →</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.galleryRow}>
-          {car.gallery.map((image, index) => (
-            <ImageBackground key={image} source={{ uri: image }} style={styles.galleryImage} imageStyle={styles.galleryRadius as ImageStyle}>
-              {index === 0 ? <View style={styles.galleryHighlight} /> : null}
-            </ImageBackground>
-          ))}
-        </ScrollView>
-      </NoxaCard>
-    </Animated.View>
-  );
-}
-
-function ActivityCard() {
-  return (
-    <Animated.View style={useEntryAnimation(320)}>
-      <NoxaCard>
-        <Text style={styles.sectionTitle}>Activity</Text>
-        <View style={styles.activityPanel}>
-          <View>
-            <Text style={styles.activityLabel}>Recent Event</Text>
-            <Text style={styles.activityTitle}>{car.activity.event}</Text>
-            <Text style={styles.activityMeta}>{car.activity.date}</Text>
-          </View>
-          <View style={styles.crewPill}>
-            <Text style={styles.crewLabel}>Crew</Text>
-            <Text style={styles.crewName}>{car.activity.crew}</Text>
-          </View>
-        </View>
-      </NoxaCard>
-    </Animated.View>
-  );
-}
-
 export default function GarageScreen() {
   const [vehicles, setVehicles] = useState<GarageVehicle[]>([]);
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
@@ -348,9 +274,6 @@ export default function GarageScreen() {
         />
         <VehicleCollection error={hasVehicleError} isLoading={isLoadingVehicles} onRetry={loadVehicles} vehicles={vehicles} />
         <StatsCard vehicle={selectedVehicle} />
-        <InstalledPartsCard />
-        <GalleryCard />
-        <ActivityCard />
         <NoxaButton title="Add Vehicle" fullWidth onPress={() => router.push('/vehicle-editor')} />
       </ScrollView>
     </NoxaScreen>
@@ -481,103 +404,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
     textTransform: 'uppercase',
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '900',
-  },
-  partsList: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  partRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  partText: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: '600',
-  },
-  viewAll: {
-    color: colors.primary,
-    fontSize: typography.caption,
-    fontWeight: '900',
-  },
-  galleryRow: {
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    paddingRight: spacing.lg,
-  },
-  galleryImage: {
-    width: 108,
-    height: 118,
-    overflow: 'hidden',
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSoft,
-  },
-  galleryRadius: {
-    borderRadius: radius.lg,
-  },
-  galleryHighlight: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: 'rgba(255,45,45,0.58)',
-  },
-  activityPanel: {
-    marginTop: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.md,
-  },
-  activityLabel: {
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  activityTitle: {
-    marginTop: spacing.xs,
-    color: colors.text,
-    fontSize: typography.sectionTitle,
-    fontWeight: '900',
-  },
-  activityMeta: {
-    marginTop: spacing.xxs,
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: '700',
-  },
-  crewPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    backgroundColor: colors.glass,
-  },
-  crewLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.3,
-    textTransform: 'uppercase',
-  },
-  crewName: {
-    marginTop: spacing.xxs,
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: '900',
   },
 });
