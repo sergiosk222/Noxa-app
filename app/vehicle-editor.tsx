@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { type ReactNode, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { NoxaButton, NoxaCard, NoxaHeader, NoxaInput, NoxaScreen } from '@/src/components/ui';
 import { supabase } from '@/src/lib/supabase';
@@ -25,9 +25,27 @@ type VehicleForm = {
   tuningStage: string;
   zeroToHundred: string;
   description: string;
+  coverImageUrl: string;
+  isPublic: boolean;
 };
 
 type VehicleErrors = Partial<Record<keyof VehicleForm | 'form', string>>;
+
+type VehicleRecord = {
+  id: string;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  horsepower: number | null;
+  color: string | null;
+  transmission: string | null;
+  drivetrain: string | null;
+  tuning_stage: string | null;
+  zero_to_hundred: number | null;
+  description: string | null;
+  cover_image_url: string | null;
+  is_public: boolean | null;
+};
 
 type NormalizedVehicle = {
   brand: string;
@@ -40,6 +58,7 @@ type NormalizedVehicle = {
   tuning_stage: string | null;
   zero_to_hundred: number | null;
   description: string | null;
+  cover_image_url: string | null;
   is_public: boolean;
 };
 
@@ -54,6 +73,8 @@ const initialForm: VehicleForm = {
   tuningStage: '',
   zeroToHundred: '',
   description: '',
+  coverImageUrl: '',
+  isPublic: true,
 };
 
 function optionalText(value: string) {
@@ -96,6 +117,7 @@ function validateForm(form: VehicleForm): { errors: VehicleErrors; values?: Norm
   const tuningStage = optionalText(form.tuningStage);
   const zeroToHundred = parseOptionalNumber(form.zeroToHundred);
   const description = optionalText(form.description);
+  const coverImageUrl = optionalText(form.coverImageUrl);
 
   if (!brand) {
     errors.brand = 'Brand is required.';
@@ -145,6 +167,10 @@ function validateForm(form: VehicleForm): { errors: VehicleErrors; values?: Norm
     errors.description = 'Description must be 1000 characters or less.';
   }
 
+  if (coverImageUrl && coverImageUrl.length > 2048) {
+    errors.coverImageUrl = 'Cover image URL must be 2048 characters or less.';
+  }
+
   if (Object.keys(errors).length > 0 || horsepower === null || Number.isNaN(horsepower)) {
     return { errors };
   }
@@ -162,7 +188,8 @@ function validateForm(form: VehicleForm): { errors: VehicleErrors; values?: Norm
       tuning_stage: tuningStage,
       zero_to_hundred: Number.isNaN(zeroToHundred) ? null : zeroToHundred,
       description,
-      is_public: true,
+      cover_image_url: coverImageUrl,
+      is_public: form.isPublic,
     },
   };
 }
@@ -243,6 +270,27 @@ function GalleryPlaceholder() {
   );
 }
 
+function formFromVehicle(vehicle: VehicleRecord): VehicleForm {
+  return {
+    brand: vehicle.brand ?? '',
+    model: vehicle.model ?? '',
+    year: vehicle.year === null ? '' : String(vehicle.year),
+    horsepower: vehicle.horsepower === null ? '' : String(vehicle.horsepower),
+    color: vehicle.color ?? colorsAvailable[0].name,
+    transmission: vehicle.transmission ?? '',
+    drivetrain: vehicle.drivetrain ?? '',
+    tuningStage: vehicle.tuning_stage ?? '',
+    zeroToHundred: vehicle.zero_to_hundred === null ? '' : String(vehicle.zero_to_hundred),
+    description: vehicle.description ?? '',
+    coverImageUrl: vehicle.cover_image_url ?? '',
+    isPublic: vehicle.is_public ?? true,
+  };
+}
+
+function getParamId(id: string | string[] | undefined) {
+  return Array.isArray(id) ? id[0] : id;
+}
+
 function FieldError({ children, message }: { children: ReactNode; message?: string }) {
   return (
     <View style={styles.fieldWrap}>
@@ -253,17 +301,70 @@ function FieldError({ children, message }: { children: ReactNode; message?: stri
 }
 
 export default function VehicleEditorScreen() {
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const vehicleId = getParamId(id);
+  const isEditMode = Boolean(vehicleId);
   const [form, setForm] = useState<VehicleForm>(initialForm);
   const [errors, setErrors] = useState<VehicleErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingVehicle, setIsLoadingVehicle] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const setField = (field: keyof VehicleForm, value: string) => {
+  const setField = (field: keyof VehicleForm, value: string | boolean) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined, form: undefined }));
   };
 
+
+  const loadVehicleForEdit = useCallback(async () => {
+    if (!vehicleId) {
+      setForm(initialForm);
+      setLoadError(null);
+      setIsLoadingVehicle(false);
+      return;
+    }
+
+    setIsLoadingVehicle(true);
+    setLoadError(null);
+    setErrors({});
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      setLoadError(userError ? getSaveErrorMessage(userError) : 'Sign in to edit this vehicle.');
+      setIsLoadingVehicle(false);
+      return;
+    }
+
+    const { data: vehicle, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('id, brand, model, year, horsepower, color, transmission, drivetrain, tuning_stage, zero_to_hundred, description, cover_image_url, is_public')
+      .eq('id', vehicleId)
+      .eq('owner_id', userData.user.id)
+      .maybeSingle();
+
+    if (vehicleError) {
+      setLoadError(getSaveErrorMessage(vehicleError));
+      setIsLoadingVehicle(false);
+      return;
+    }
+
+    if (!vehicle) {
+      setLoadError('Vehicle not found or you do not have permission to edit it.');
+      setIsLoadingVehicle(false);
+      return;
+    }
+
+    setForm(formFromVehicle(vehicle as VehicleRecord));
+    setIsLoadingVehicle(false);
+  }, [vehicleId]);
+
+  useEffect(() => {
+    void loadVehicleForEdit();
+  }, [loadVehicleForEdit]);
+
   const saveVehicle = async () => {
-    if (isSubmitting) {
+    if (isSubmitting || isLoadingVehicle) {
       return;
     }
 
@@ -294,40 +395,47 @@ export default function VehicleEditorScreen() {
         return;
       }
 
+      const vehiclePayload = {
+        brand: validation.values.brand,
+        model: validation.values.model,
+        year: validation.values.year,
+        horsepower: validation.values.horsepower,
+        color: validation.values.color,
+        transmission: validation.values.transmission,
+        drivetrain: validation.values.drivetrain,
+        tuning_stage: validation.values.tuning_stage,
+        zero_to_hundred: validation.values.zero_to_hundred,
+        description: validation.values.description,
+        cover_image_url: validation.values.cover_image_url,
+        is_public: validation.values.is_public,
+      };
+
+      if (isEditMode && vehicleId) {
+        const { data: updatedVehicle, error: updateError } = await supabase.from('vehicles').update(vehiclePayload).eq('id', vehicleId).eq('owner_id', user.id).select('id').maybeSingle();
+
+        setIsSubmitting(false);
+
+        if (updateError) {
+          setErrors({ form: getSaveErrorMessage(updateError) });
+          return;
+        }
+
+        if (!updatedVehicle) {
+          setErrors({ form: 'Vehicle not found or you do not have permission to edit it.' });
+          return;
+        }
+
+        router.replace({ pathname: '/vehicle-details', params: { id: vehicleId } });
+        return;
+      }
+
       const { data: vehicle, error: insertError } = await supabase
         .from('vehicles')
         .insert({
           owner_id: user.id,
-          brand: validation.values.brand,
-          model: validation.values.model,
-          year: validation.values.year,
-          horsepower: validation.values.horsepower,
-          color: validation.values.color,
-          transmission: validation.values.transmission,
-          drivetrain: validation.values.drivetrain,
-          tuning_stage: validation.values.tuning_stage,
-          zero_to_hundred: validation.values.zero_to_hundred,
-          description: validation.values.description,
-          is_public: validation.values.is_public,
+          ...vehiclePayload,
         })
-        .select(`
-          id,
-          owner_id,
-          brand,
-          model,
-          year,
-          horsepower,
-          color,
-          transmission,
-          drivetrain,
-          tuning_stage,
-          zero_to_hundred,
-          description,
-          cover_image_url,
-          is_public,
-          created_at,
-          updated_at
-        `)
+        .select('id')
         .single();
 
       setIsSubmitting(false);
@@ -346,11 +454,34 @@ export default function VehicleEditorScreen() {
     }
   };
 
+  if (isLoadingVehicle) {
+    return (
+      <NoxaScreen padded={false}>
+        <View style={styles.stateWrap}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.stateTitle}>Loading vehicle...</Text>
+        </View>
+      </NoxaScreen>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <NoxaScreen padded={false}>
+        <View style={styles.stateWrap}>
+          <Text style={styles.stateTitle}>Unable to edit vehicle</Text>
+          <Text style={styles.stateCopy}>{loadError}</Text>
+          <NoxaButton title="Back" onPress={() => router.back()} />
+        </View>
+      </NoxaScreen>
+    );
+  }
+
   return (
     <NoxaScreen padded={false}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboardAvoiding}>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-          <NoxaHeader left={<BackButton />} title="EDIT VEHICLE" subtitle="Build your automotive identity" />
+          <NoxaHeader left={<BackButton />} title={isEditMode ? 'EDIT VEHICLE' : 'ADD VEHICLE'} subtitle="Build your automotive identity" />
 
           <View style={styles.heroPanel}>
             <Text style={styles.heroTitle}>Shape the profile your crew sees.</Text>
@@ -371,6 +502,9 @@ export default function VehicleEditorScreen() {
             </FieldError>
             <ColorSelector disabled={isSubmitting} error={errors.color} onSelect={(value) => setField('color', value)} selectedColor={form.color} />
             <GalleryPlaceholder />
+            <FieldError message={errors.coverImageUrl}>
+              <NoxaInput editable={!isSubmitting} label="Cover image URL" maxLength={2049} onChangeText={(value) => setField('coverImageUrl', value)} placeholder="https://..." value={form.coverImageUrl} autoCapitalize="none" />
+            </FieldError>
           </FormSection>
 
           <FormSection eyebrow="Optional" title="Build Details">
@@ -395,6 +529,13 @@ export default function VehicleEditorScreen() {
                 <TextInput editable={!isSubmitting} maxLength={1001} multiline onChangeText={(value) => setField('description', value)} placeholder="Tell the story behind the build..." placeholderTextColor={colors.textMuted} selectionColor={colors.primary} style={[styles.textArea]} textAlignVertical="top" value={form.description} />
               </View>
             </FieldError>
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: form.isPublic }} disabled={isSubmitting} onPress={() => setField('isPublic', !form.isPublic)} style={({ pressed }) => [styles.visibilityToggle, pressed && styles.pressed, isSubmitting && styles.disabled]}>
+              <View>
+                <Text style={styles.label}>Visibility</Text>
+                <Text style={styles.visibilityText}>{form.isPublic ? 'Public vehicle profile' : 'Private vehicle profile'}</Text>
+              </View>
+              <Ionicons name={form.isPublic ? 'eye' : 'eye-off'} size={22} color={colors.primary} />
+            </Pressable>
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Installed parts</Text>
               <TextInput editable={!isSubmitting} multiline placeholder="Exhaust, coilovers, wheels, tune..." placeholderTextColor={colors.textMuted} selectionColor={colors.primary} style={[styles.textArea]} textAlignVertical="top" />
@@ -402,7 +543,7 @@ export default function VehicleEditorScreen() {
           </FormSection>
 
           <View style={styles.actions}>
-            <NoxaButton disabled={isSubmitting} loading={isSubmitting} onPress={saveVehicle} title="Save Vehicle" fullWidth />
+            <NoxaButton disabled={isSubmitting} loading={isSubmitting} onPress={saveVehicle} title={isEditMode ? 'SAVE CHANGES' : 'Save Vehicle'} fullWidth />
             <NoxaButton disabled={isSubmitting} title="Cancel" variant="secondary" fullWidth onPress={() => router.back()} />
           </View>
         </ScrollView>
@@ -589,6 +730,42 @@ const styles = StyleSheet.create({
     borderColor: colors.borderAccent,
     color: colors.text,
     fontSize: typography.caption,
+    fontWeight: '800',
+  },
+  stateWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl,
+  },
+  stateTitle: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  stateCopy: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  visibilityToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  visibilityText: {
+    marginTop: spacing.xxs,
+    color: colors.text,
+    fontSize: typography.body,
     fontWeight: '800',
   },
   actions: {
