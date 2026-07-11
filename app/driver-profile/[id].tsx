@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, type Href } from "expo-router";
 import { useState } from "react";
 import {
   Image,
@@ -15,6 +15,12 @@ import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 import { NoxaScreen } from "@/src/components/ui";
 
 type IconName = keyof typeof Ionicons.glyphMap;
+
+type ProfileStat = {
+  label: string;
+  value: string | number;
+  href?: Href;
+};
 
 function HeaderAction({
   icon,
@@ -65,7 +71,7 @@ export default function PublicDriverProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const driver = getPublicDriverById(id);
   const [isFollowing, setIsFollowing] = useState(false);
-  const stats = [
+  const stats: ProfileStat[] = [
     {
       label: "Followers",
       value: driver.stats.followers,

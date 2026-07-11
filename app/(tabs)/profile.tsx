@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
 import {
   Animated,
@@ -23,26 +23,34 @@ import { animations, colors, radius, spacing, typography } from "@/src/theme";
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
+type ProfileStat = {
+  label: string;
+  value: string | number;
+  href?: Href;
+};
+
+const profileStats: ProfileStat[] = [
+  { label: "Cars", value: String(currentUser.carsCount) },
+  { label: "Crews", value: String(currentUser.crewsCount) },
+  { label: "Events", value: String(currentUser.eventsCount) },
+  {
+    label: "Followers",
+    value: String(currentUser.followersCount),
+    href: "/social-list?tab=followers",
+  },
+  {
+    label: "Following",
+    value: String(currentUser.followingCount),
+    href: "/social-list?tab=following",
+  },
+];
+
 const profile = {
   name: currentUser.name,
   username: currentUser.username,
   status: currentUser.status.toUpperCase(),
   location: currentUser.city,
-  stats: [
-    { label: "Cars", value: String(currentUser.carsCount) },
-    { label: "Crews", value: String(currentUser.crewsCount) },
-    { label: "Events", value: String(currentUser.eventsCount) },
-    {
-      label: "Followers",
-      value: String(currentUser.followersCount),
-      href: "/social-list?tab=followers",
-    },
-    {
-      label: "Following",
-      value: String(currentUser.followingCount),
-      href: "/social-list?tab=following",
-    },
-  ],
+  stats: profileStats,
   achievements: ["Night Driver", "Crew Leader", "Early Member"],
   activity: {
     label: "Joined",
