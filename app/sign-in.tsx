@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 
+import { supabase } from "@/src/lib/supabase";
 import {
   NoxaButton,
   NoxaCard,
@@ -23,14 +24,32 @@ import { colors, radius, spacing, typography } from "@/src/theme";
 type SignInErrors = {
   email?: string;
   password?: string;
+  form?: string;
 };
 
 const emailPattern = /^\S+@\S+\.\S+$/;
+
+function getSignInErrorMessage(message?: string) {
+  if (message === "Invalid login credentials") {
+    return "Incorrect email or password.";
+  }
+
+  if (message === "Email not confirmed") {
+    return "Confirm your email before signing in.";
+  }
+
+  if (message === "Network request failed") {
+    return "Unable to connect. Check your internet connection.";
+  }
+
+  return "Unable to sign in. Please try again.";
+}
 
 export default function SignInScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<SignInErrors>({});
 
   const validate = () => {
@@ -52,9 +71,41 @@ export default function SignInScreen() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSignIn = () => {
-    if (validate()) {
-      router.replace("/(tabs)");
+  const handleSignIn = async () => {
+    if (isLoading) {
+      return;
+    }
+
+    if (!validate()) {
+      return;
+    }
+
+    setErrors({});
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      if (error) {
+        setErrors({ form: getSignInErrorMessage(error.message) });
+        return;
+      }
+
+      if (data.session) {
+        router.replace("/(tabs)");
+      }
+    } catch (error) {
+      setErrors({
+        form:
+          error instanceof Error
+            ? getSignInErrorMessage(error.message)
+            : "Unable to sign in. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -126,7 +177,17 @@ export default function SignInScreen() {
                 <Text style={styles.textLink}>Forgot password?</Text>
               </Pressable>
 
-              <NoxaButton fullWidth title="Sign In" onPress={handleSignIn} />
+              {errors.form ? (
+                <Text style={styles.error}>{errors.form}</Text>
+              ) : null}
+
+              <NoxaButton
+                disabled={isLoading}
+                fullWidth
+                loading={isLoading}
+                title="Sign In"
+                onPress={handleSignIn}
+              />
             </View>
           </NoxaCard>
 
