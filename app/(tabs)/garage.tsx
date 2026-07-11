@@ -247,7 +247,6 @@ export default function GarageScreen() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      setVehicles([]);
       setHasVehicleError(true);
     } else {
       setVehicles((data ?? []) as GarageVehicle[]);

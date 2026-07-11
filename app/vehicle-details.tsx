@@ -327,7 +327,13 @@ export default function VehicleDetailsScreen() {
       .eq('owner_id', currentUser.id)
       .select('id');
 
-    if (deleteError || !data || data.length === 0) {
+    if (deleteError) {
+      setIsDeleting(false);
+      Alert.alert('Unable to delete vehicle', deleteError.message);
+      return;
+    }
+
+    if (!data || data.length === 0) {
       setIsDeleting(false);
       Alert.alert('Unable to delete vehicle', 'No vehicle was deleted. Please try again.');
       return;
@@ -348,7 +354,7 @@ export default function VehicleDetailsScreen() {
     ]);
   }, [deleteVehicle, isDeleting]);
 
-  const canEditVehicle = Boolean(vehicle && currentUserId && currentUserId === vehicle.owner_id);
+  const ownsVehicle = Boolean(vehicle && currentUserId && currentUserId === vehicle.owner_id);
   const showCta = Boolean(vehicle?.owner_id);
 
   return (
@@ -368,9 +374,9 @@ export default function VehicleDetailsScreen() {
       </ScrollView>
       {showCta ? (
         <View style={styles.ctaWrap} pointerEvents="box-none">
-          {canEditVehicle ? <NoxaButton title="Edit Vehicle" fullWidth onPress={() => router.push({ pathname: '/vehicle-editor', params: { id: vehicle?.id } })} /> : null}
-          {canEditVehicle ? <NoxaButton title={isDeleting ? 'Deleting...' : 'Delete Vehicle'} fullWidth variant="danger" disabled={isDeleting} onPress={confirmDeleteVehicle} /> : null}
-          <NoxaButton title="View Owner" fullWidth variant={canEditVehicle ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: vehicle?.owner_id } })} />
+          {ownsVehicle ? <NoxaButton title="Edit Vehicle" fullWidth onPress={() => router.push({ pathname: '/vehicle-editor', params: { id: vehicle?.id } })} /> : null}
+          {ownsVehicle ? <NoxaButton title={isDeleting ? 'Deleting...' : 'Delete Vehicle'} fullWidth variant="danger" disabled={isDeleting} onPress={confirmDeleteVehicle} /> : null}
+          <NoxaButton title="View Owner" fullWidth variant={ownsVehicle ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: vehicle?.owner_id } })} />
         </View>
       ) : null}
     </NoxaScreen>
