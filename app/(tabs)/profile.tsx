@@ -148,19 +148,23 @@ function ProfileHero() {
 function StatsGrid() {
   return (
     <Animated.View style={[styles.statsGrid, useEntryAnimation(90)]}>
-      {profile.stats.map((stat) => (
-        <Pressable
-          key={stat.label}
-          accessibilityRole={stat.href ? "button" : undefined}
-          onPress={stat.href ? () => router.push(stat.href) : undefined}
-          style={({ pressed }) => [stat.href && pressed && styles.pressed]}
-        >
-          <NoxaCard>
-            <Text style={styles.statValue}>{stat.value}</Text>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-          </NoxaCard>
-        </Pressable>
-      ))}
+      {profile.stats.map((stat) => {
+        const statHref = stat.href;
+
+        return (
+          <Pressable
+            key={stat.label}
+            accessibilityRole={statHref ? "button" : undefined}
+            onPress={statHref ? () => router.push(statHref) : undefined}
+            style={({ pressed }) => [statHref && pressed && styles.pressed]}
+          >
+            <NoxaCard>
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </NoxaCard>
+          </Pressable>
+        );
+      })}
     </Animated.View>
   );
 }

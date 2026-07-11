@@ -138,21 +138,25 @@ export default function PublicDriverProfileScreen() {
         </View>
 
         <View style={styles.statsCard}>
-          {stats.map((stat) => (
-            <Pressable
-              key={stat.label}
-              accessibilityRole={stat.href ? "button" : undefined}
-              onPress={stat.href ? () => router.push(stat.href) : undefined}
-              style={({ pressed }) => [
-                styles.statItem,
-                stat.href && styles.statLink,
-                pressed && stat.href && styles.pressed,
-              ]}
-            >
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </Pressable>
-          ))}
+          {stats.map((stat) => {
+            const statHref = stat.href;
+
+            return (
+              <Pressable
+                key={stat.label}
+                accessibilityRole={statHref ? "button" : undefined}
+                onPress={statHref ? () => router.push(statHref) : undefined}
+                style={({ pressed }) => [
+                  styles.statItem,
+                  statHref && styles.statLink,
+                  pressed && statHref && styles.pressed,
+                ]}
+              >
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <SectionTitle title="Garage Preview" />
