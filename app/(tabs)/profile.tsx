@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, type Href } from "expo-router";
+import { router, type Href, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -344,9 +344,11 @@ export default function ProfileScreen() {
     setIsProfileLoading(false);
   }, []);
 
-  useEffect(() => {
-    void loadProfile();
-  }, [loadProfile]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadProfile();
+    }, [loadProfile]),
+  );
 
   const signOut = async () => {
     if (isSigningOut) {
@@ -408,7 +410,12 @@ export default function ProfileScreen() {
         <AchievementsCard />
         <RecentActivityCard />
         <QuickActionsCard />
-        <NoxaButton title="Edit Profile" fullWidth />
+        <NoxaButton
+          title="Edit Profile"
+          variant="secondary"
+          fullWidth
+          onPress={() => router.push("/edit-profile")}
+        />
         <View style={styles.logoutWrap}>
           <Pressable
             accessibilityRole="button"
