@@ -225,6 +225,7 @@ export default function VehicleDetailsScreen() {
   const [owner, setOwner] = useState<VehicleOwner | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const informationRows = useMemo<VehicleInfoRow[]>(() => {
     if (!vehicle) {
@@ -264,6 +265,9 @@ export default function VehicleDetailsScreen() {
     setIsLoading(true);
     setError(null);
 
+    const { data: userData } = await supabase.auth.getUser();
+    setCurrentUserId(userData.user?.id ?? null);
+
     const { data: vehicleData, error: vehicleError } = await supabase.from('vehicles').select(vehicleSelect).eq('id', vehicleId).maybeSingle();
 
     if (vehicleError || !vehicleData) {
@@ -293,6 +297,7 @@ export default function VehicleDetailsScreen() {
     void loadVehicle();
   }, [loadVehicle]);
 
+  const canEditVehicle = Boolean(vehicle && currentUserId && currentUserId === vehicle.owner_id);
   const showCta = Boolean(vehicle?.owner_id);
 
   return (
@@ -312,7 +317,8 @@ export default function VehicleDetailsScreen() {
       </ScrollView>
       {showCta ? (
         <View style={styles.ctaWrap} pointerEvents="box-none">
-          <NoxaButton title="View Owner" fullWidth onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: vehicle?.owner_id } })} />
+          {canEditVehicle ? <NoxaButton title="Edit Vehicle" fullWidth onPress={() => router.push({ pathname: '/vehicle-editor', params: { id: vehicle?.id } })} /> : null}
+          <NoxaButton title="View Owner" fullWidth variant={canEditVehicle ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: vehicle?.owner_id } })} />
         </View>
       ) : null}
     </NoxaScreen>
@@ -354,5 +360,5 @@ const styles = StyleSheet.create({
   stateText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700', textAlign: 'center' },
   retryButton: { marginTop: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.border },
   retryText: { color: colors.text, fontSize: typography.caption, fontWeight: '900' },
-  ctaWrap: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg },
+  ctaWrap: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.lg, gap: spacing.sm },
 });
