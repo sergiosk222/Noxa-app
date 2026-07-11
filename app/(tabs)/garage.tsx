@@ -222,10 +222,11 @@ export default function GarageScreen() {
   const [vehicles, setVehicles] = useState<GarageVehicle[]>([]);
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
   const [hasVehicleError, setHasVehicleError] = useState(false);
+  const hasLoadedVehiclesRef = useRef(false);
   const selectedVehicle = vehicles[0] ?? null;
 
   const loadVehicles = useCallback(async () => {
-    setIsLoadingVehicles(true);
+    setIsLoadingVehicles(!hasLoadedVehiclesRef.current);
     setHasVehicleError(false);
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -234,6 +235,7 @@ export default function GarageScreen() {
     if (authError || !user) {
       setVehicles([]);
       setHasVehicleError(true);
+      hasLoadedVehiclesRef.current = true;
       setIsLoadingVehicles(false);
       return;
     }
@@ -251,6 +253,7 @@ export default function GarageScreen() {
       setVehicles((data ?? []) as GarageVehicle[]);
     }
 
+    hasLoadedVehiclesRef.current = true;
     setIsLoadingVehicles(false);
   }, []);
 

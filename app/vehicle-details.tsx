@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, type ImageStyle } from 'react-native';
+import { ActivityIndicator, Alert, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, type ImageStyle } from 'react-native';
 
 import { NoxaAvatar, NoxaBadge, NoxaButton, NoxaCard, NoxaScreen } from '@/src/components/ui';
 import { supabase } from '@/src/lib/supabase';
@@ -226,6 +226,7 @@ export default function VehicleDetailsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const informationRows = useMemo<VehicleInfoRow[]>(() => {
     if (!vehicle) {
@@ -297,6 +298,56 @@ export default function VehicleDetailsScreen() {
     void loadVehicle();
   }, [loadVehicle]);
 
+  const deleteVehicle = useCallback(async () => {
+    if (isDeleting || !vehicle) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const currentUser = authData.user;
+
+    if (authError || !currentUser) {
+      setIsDeleting(false);
+      Alert.alert('Unable to delete vehicle', 'You must be signed in to delete this vehicle.');
+      return;
+    }
+
+    if (currentUser.id !== vehicle.owner_id) {
+      setIsDeleting(false);
+      Alert.alert('Unable to delete vehicle', 'You can only delete vehicles you own.');
+      return;
+    }
+
+    const { data, error: deleteError } = await supabase
+      .from('vehicles')
+      .delete()
+      .eq('id', vehicle.id)
+      .eq('owner_id', currentUser.id)
+      .select('id');
+
+    if (deleteError || !data || data.length === 0) {
+      setIsDeleting(false);
+      Alert.alert('Unable to delete vehicle', 'No vehicle was deleted. Please try again.');
+      return;
+    }
+
+    setIsDeleting(false);
+    router.replace('/(tabs)/garage');
+  }, [isDeleting, vehicle]);
+
+  const confirmDeleteVehicle = useCallback(() => {
+    if (isDeleting) {
+      return;
+    }
+
+    Alert.alert('Delete vehicle?', 'This vehicle will be permanently removed from your garage.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void deleteVehicle() },
+    ]);
+  }, [deleteVehicle, isDeleting]);
+
   const canEditVehicle = Boolean(vehicle && currentUserId && currentUserId === vehicle.owner_id);
   const showCta = Boolean(vehicle?.owner_id);
 
@@ -318,6 +369,7 @@ export default function VehicleDetailsScreen() {
       {showCta ? (
         <View style={styles.ctaWrap} pointerEvents="box-none">
           {canEditVehicle ? <NoxaButton title="Edit Vehicle" fullWidth onPress={() => router.push({ pathname: '/vehicle-editor', params: { id: vehicle?.id } })} /> : null}
+          {canEditVehicle ? <NoxaButton title={isDeleting ? 'Deleting...' : 'Delete Vehicle'} fullWidth variant="danger" disabled={isDeleting} onPress={confirmDeleteVehicle} /> : null}
           <NoxaButton title="View Owner" fullWidth variant={canEditVehicle ? 'secondary' : 'primary'} onPress={() => router.push({ pathname: '/driver-profile/[id]', params: { id: vehicle?.owner_id } })} />
         </View>
       ) : null}
