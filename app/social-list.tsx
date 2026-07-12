@@ -1,56 +1,52 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { NoxaScreen } from "@/src/components/ui";
+import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 
 type SocialTab = "followers" | "following";
-type SocialStatus = "ONLINE" | "CRUISING" | "OFFLINE";
 
-type SocialUser = {
+type SocialProfile = {
   id: string;
-  name: string;
-  username: string;
-  car: string;
-  status: SocialStatus;
-  initials: string;
-  isFollowing: boolean;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  city: string | null;
 };
 
-const mockUsers: SocialUser[] = [
-  {
-    id: "alex-voss",
-    name: "Alex Voss",
-    username: "@voss.nsx",
-    car: "BMW M3 G80",
-    status: "ONLINE",
-    initials: "AV",
-    isFollowing: false,
-  },
-  {
-    id: "kai-nakamura",
-    name: "Kai Nakamura",
-    username: "@kai.s15",
-    car: "Nissan Silvia S15",
-    status: "CRUISING",
-    initials: "KN",
-    isFollowing: true,
-  },
-  {
-    id: "maria-leon",
-    name: "Maria Leon",
-    username: "@maria.gti",
-    car: "Volkswagen Golf GTI",
-    status: "OFFLINE",
-    initials: "ML",
-    isFollowing: true,
-  },
-];
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function getInitialTab(tab?: string | string[]): SocialTab {
-  return tab === "following" ? "following" : "followers";
+function normalizeParam(value?: string | string[]) {
+  return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+}
+
+function normalizeMode(value?: string | string[]): SocialTab | null {
+  const mode = normalizeParam(value);
+  return mode === "followers" || mode === "following" ? mode : null;
+}
+
+function getInitials(displayName: string) {
+  return (
+    displayName
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2) || "NX"
+  );
 }
 
 function Header() {
@@ -106,105 +102,254 @@ function SocialTabs({
   );
 }
 
-function StatusBadge({ status }: { status: SocialStatus }) {
+function StateCard({
+  title,
+  message,
+  onRetry,
+}: {
+  title: string;
+  message: string;
+  onRetry?: () => void;
+}) {
   return (
-    <View
-      style={[styles.statusBadge, status === "OFFLINE" && styles.offlineBadge]}
-    >
-      <View
-        style={[styles.statusDot, status === "OFFLINE" && styles.offlineDot]}
-      />
-      <Text
-        style={[styles.statusText, status === "OFFLINE" && styles.offlineText]}
-      >
-        {status}
-      </Text>
+    <View style={styles.stateCard}>
+      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={styles.stateMessage}>{message}</Text>
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRetry}
+          style={({ pressed }) => [
+            styles.retryButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
-function SocialRow({ user }: { user: SocialUser }) {
-  const [isFollowing, setIsFollowing] = useState(user.isFollowing);
+function SocialRow({ profile }: { profile: SocialProfile }) {
+  const displayName = profile.display_name?.trim() || "NOXA Driver";
+  const username = profile.username ? `@${profile.username}` : "@noxa.driver";
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Open ${user.name} public driver profile`}
-      onPress={() => undefined}
+      accessibilityLabel={`Open ${displayName} public driver profile`}
+      onPress={() =>
+        router.push({
+          pathname: "/driver-profile/[id]",
+          params: { id: profile.id },
+        })
+      }
       style={({ pressed }) => [styles.userRow, pressed && styles.pressed]}
     >
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{user.initials}</Text>
-      </View>
-      <View style={styles.userCopy}>
-        <View style={styles.nameLine}>
-          <Text style={styles.userName} numberOfLines={1}>
-            {user.name}
-          </Text>
-          <StatusBadge status={user.status} />
+      {profile.avatar_url ? (
+        <Image
+          source={{ uri: profile.avatar_url }}
+          style={styles.avatarImage}
+        />
+      ) : (
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{getInitials(displayName)}</Text>
         </View>
-        <Text style={styles.username}>{user.username}</Text>
-        <Text style={styles.car}>{user.car}</Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          isFollowing ? `Unfollow ${user.name}` : `Follow ${user.name}`
-        }
-        onPress={(event) => {
-          event.stopPropagation();
-          setIsFollowing((value) => !value);
-        }}
-        style={({ pressed }) => [
-          styles.followButton,
-          isFollowing && styles.followingButton,
-          pressed && styles.pressed,
-        ]}
-      >
-        <Text
-          style={[
-            styles.followButtonText,
-            isFollowing && styles.followingButtonText,
-          ]}
-        >
-          {isFollowing ? "Following" : "Follow"}
+      )}
+      <View style={styles.userCopy}>
+        <Text style={styles.userName} numberOfLines={1}>
+          {displayName}
         </Text>
-      </Pressable>
+        <Text style={styles.username}>{username}</Text>
+        <Text style={styles.city}>{profile.city || "NOXA community"}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
     </Pressable>
   );
 }
 
 export default function SocialListScreen() {
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const [activeTab, setActiveTab] = useState<SocialTab>(() =>
-    getInitialTab(tab),
+  const { userId, mode, tab } = useLocalSearchParams<{
+    userId?: string | string[];
+    mode?: string | string[];
+    tab?: string | string[];
+  }>();
+  const initialMode = useMemo(
+    () => normalizeMode(mode) ?? normalizeMode(tab),
+    [mode, tab],
   );
-  const users = useMemo(
-    () => (activeTab === "followers" ? mockUsers : [...mockUsers].reverse()),
-    [activeTab],
+  const [activeTab, setActiveTab] = useState<SocialTab>(
+    initialMode ?? "followers",
   );
+  const [targetUserId, setTargetUserId] = useState("");
+  const [profiles, setProfiles] = useState<SocialProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const routeUserId = useMemo(() => normalizeParam(userId), [userId]);
+  const hasInvalidMode =
+    !initialMode && Boolean(normalizeParam(mode) || normalizeParam(tab));
+
+  useEffect(() => {
+    if (initialMode) {
+      setActiveTab(initialMode);
+    }
+  }, [initialMode]);
+
+  const loadSocialList = useCallback(
+    async ({ refreshing = false } = {}) => {
+      if (hasInvalidMode) {
+        setErrorMessage("This social list mode is invalid.");
+        setProfiles([]);
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      if (refreshing) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setErrorMessage(null);
+
+      let targetId = routeUserId;
+      if (!targetId) {
+        const { data } = await supabase.auth.getUser();
+        targetId = data.user?.id ?? "";
+      }
+
+      if (!uuidPattern.test(targetId)) {
+        setTargetUserId(targetId);
+        setProfiles([]);
+        setErrorMessage("This social list link is invalid.");
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      setTargetUserId(targetId);
+
+      const { data: followRows, error: followError } =
+        activeTab === "followers"
+          ? await supabase
+              .from("follows")
+              .select("follower_id, created_at")
+              .eq("following_id", targetId)
+              .order("created_at", { ascending: false })
+          : await supabase
+              .from("follows")
+              .select("following_id, created_at")
+              .eq("follower_id", targetId)
+              .order("created_at", { ascending: false });
+
+      if (followError) {
+        setProfiles([]);
+        setErrorMessage("Unable to load this social list.");
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      const profileIds = (followRows ?? [])
+        .map((row) => {
+          const followRow = row as {
+            follower_id?: string | null;
+            following_id?: string | null;
+          };
+          return activeTab === "followers"
+            ? followRow.follower_id
+            : followRow.following_id;
+        })
+        .filter((id): id is string => Boolean(id));
+
+      if (profileIds.length === 0) {
+        setProfiles([]);
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      const { data: profileRows, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, display_name, username, avatar_url, city")
+        .in("id", profileIds);
+
+      if (profileError) {
+        setProfiles([]);
+        setErrorMessage("Unable to load driver profiles.");
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
+      const profileById = new Map(
+        (profileRows ?? []).map((profile) => [profile.id, profile]),
+      );
+      setProfiles(
+        profileIds
+          .map((id) => profileById.get(id))
+          .filter(Boolean) as SocialProfile[],
+      );
+      setIsLoading(false);
+      setIsRefreshing(false);
+    },
+    [activeTab, hasInvalidMode, routeUserId],
+  );
+
+  useEffect(() => {
+    void loadSocialList();
+  }, [loadSocialList]);
+
+  const emptyTitle =
+    activeTab === "followers" ? "No followers yet" : "Not following anyone yet";
+  const emptyMessage =
+    activeTab === "followers"
+      ? "Real followers will appear here when drivers follow this profile."
+      : "Real following relationships will appear here when this driver follows others.";
 
   return (
     <NoxaScreen padded={false}>
-      <ScrollView
+      <FlatList
+        data={profiles}
+        keyExtractor={(item) => `${activeTab}-${targetUserId}-${item.id}`}
+        renderItem={({ item }) => <SocialRow profile={item} />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
-      >
-        <Header />
-        <SocialTabs activeTab={activeTab} onChange={setActiveTab} />
-        <View style={styles.futureCard}>
-          <Ionicons name="search" size={17} color={colors.textMuted} />
-          <Text style={styles.futureText}>
-            Search, mutuals, and profile routing are ready for the real social
-            graph.
-          </Text>
-        </View>
-        <View style={styles.listCard}>
-          {users.map((user) => (
-            <SocialRow key={`${activeTab}-${user.id}`} user={user} />
-          ))}
-        </View>
-      </ScrollView>
+        refreshControl={
+          <RefreshControl
+            tintColor={colors.primary}
+            refreshing={isRefreshing}
+            onRefresh={() => void loadSocialList({ refreshing: true })}
+          />
+        }
+        ListHeaderComponent={
+          <>
+            <Header />
+            <SocialTabs activeTab={activeTab} onChange={setActiveTab} />
+          </>
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.loadingCard}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.stateMessage}>
+                Loading real social graph…
+              </Text>
+            </View>
+          ) : errorMessage ? (
+            <StateCard
+              title="Social list unavailable"
+              message={errorMessage}
+              onRetry={loadSocialList}
+            />
+          ) : (
+            <StateCard title={emptyTitle} message={emptyMessage} />
+          )
+        }
+      />
     </NoxaScreen>
   );
 }
@@ -271,24 +416,47 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   activeTabText: { color: colors.text },
-  futureCard: {
-    flexDirection: "row",
+  loadingCard: {
     alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.lg,
+    gap: spacing.md,
+    padding: spacing.xl,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.glass,
+    backgroundColor: colors.surface,
   },
-  futureText: {
-    flex: 1,
+  stateCard: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  stateTitle: {
+    color: colors.text,
+    fontSize: typography.h2,
+    fontWeight: "900",
+  },
+  stateMessage: {
     color: colors.textMuted,
-    fontSize: typography.caption,
+    fontSize: typography.body,
     fontWeight: "700",
-    lineHeight: 18,
+    lineHeight: 22,
   },
-  listCard: { gap: spacing.sm },
+  retryButton: {
+    alignSelf: "flex-start",
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    ...shadows.redGlow,
+  },
+  retryText: {
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: "900",
+  },
   userRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -310,15 +478,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "#1B1D24",
   },
+  avatarImage: { width: 56, height: 56, borderRadius: 28 },
   avatarText: {
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "900",
   },
   userCopy: { flex: 1, minWidth: 0, gap: 3 },
-  nameLine: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   userName: {
-    flexShrink: 1,
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "900",
@@ -328,46 +495,5 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     fontWeight: "800",
   },
-  car: { color: colors.text, fontSize: typography.caption, fontWeight: "800" },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(34,197,94,0.12)",
-  },
-  offlineBadge: { backgroundColor: colors.glass },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.success,
-  },
-  offlineDot: { backgroundColor: colors.textMuted },
-  statusText: { color: colors.success, fontSize: 9, fontWeight: "900" },
-  offlineText: { color: colors.textMuted },
-  followButton: {
-    minWidth: 88,
-    minHeight: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-    ...shadows.redGlow,
-  },
-  followingButton: {
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: colors.surfaceSoft,
-    shadowOpacity: 0,
-  },
-  followButtonText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: "900",
-  },
-  followingButtonText: { color: colors.textMuted },
+  city: { color: colors.text, fontSize: typography.caption, fontWeight: "800" },
 });
