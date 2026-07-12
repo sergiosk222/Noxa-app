@@ -4,12 +4,12 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Platform,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, {
   Marker,
   PROVIDER_GOOGLE,
@@ -41,26 +41,66 @@ const DEFAULT_DELTA = { latitudeDelta: 0.075, longitudeDelta: 0.075 };
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const darkMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#111419" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8f98a6" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0A0C10" }] },
+const TAB_BAR_HEIGHT = 82;
+const TAB_BAR_BOTTOM_GAP = spacing.md;
+const FLOATING_GAP = spacing.sm;
+
+const androidNoxaMapStyle = [
+  { elementType: "geometry", stylers: [{ color: "#0A0C0F" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#737984" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#090B0E" }] },
+  {
+    featureType: "administrative",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1B2028" }],
+  },
+  {
+    featureType: "landscape",
+    elementType: "geometry",
+    stylers: [{ color: "#0A0C0F" }],
+  },
+  {
+    featureType: "landscape.natural",
+    elementType: "geometry",
+    stylers: [{ color: "#111419" }],
+  },
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#111419" }],
+  },
+  { featureType: "poi.school", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.shopping_mall", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.sports_complex", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.tourist_attraction", stylers: [{ visibility: "off" }] },
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [{ color: "#242a33" }],
+    stylers: [{ color: "#242830" }],
   },
   {
     featureType: "road.arterial",
     elementType: "geometry",
-    stylers: [{ color: "#2f3540" }],
+    stylers: [{ color: "#2C313A" }],
   },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#343943" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "geometry",
+    stylers: [{ color: "#1D222A" }],
+  },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [{ color: "#070A0F" }],
+    stylers: [{ color: "#070A0E" }],
   },
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
 ] satisfies MapViewProps["customMapStyle"];
 
 function HeaderAction({
@@ -102,9 +142,15 @@ function formatEventTime(value: string) {
   }).format(date);
 }
 
-function EventCard({ event }: { event: EventMarkerRow }) {
+function EventCard({
+  event,
+  bottomOffset,
+}: {
+  event: EventMarkerRow;
+  bottomOffset: number;
+}) {
   return (
-    <View style={styles.eventCard}>
+    <View style={[styles.eventCard, { bottom: bottomOffset }]}>
       <Text style={styles.cardKicker}>Upcoming event</Text>
       <Text style={styles.cardTitle}>{event.title}</Text>
       <Text style={styles.cardSubtitle}>
@@ -132,6 +178,7 @@ export default function LiveMapScreen() {
     focusEventId?: string;
     mapMode?: string;
   }>();
+  const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView | null>(null);
   const [driverLocation, setDriverLocation] = useState<LatLng | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
@@ -240,99 +287,137 @@ export default function LiveMapScreen() {
     [animateTo],
   );
 
+  const recenterMap = useCallback(async () => {
+    const point =
+      driverLocation ?? (await loadDriverLocation().catch(() => null));
+    animateTo(point ? pointRegion(point) : pointRegion(THESSALONIKI));
+  }, [animateTo, driverLocation, loadDriverLocation]);
+
+  const headerTop = insets.top + spacing.sm;
+  const headerBottom = headerTop + 52;
+  const eventCardBottom =
+    insets.bottom + TAB_BAR_BOTTOM_GAP + TAB_BAR_HEIGHT + FLOATING_GAP;
+  const controlBottom = eventCardBottom + (selectedEvent ? 188 : spacing.md);
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>N</Text>
-        </View>
-        <View style={styles.logoWrap}>
-          <View style={styles.logoSpeedLine} />
-          <Text style={styles.logo}>NOXA</Text>
-        </View>
-        <View style={styles.headerActions}>
-          <HeaderAction
-            icon="search-outline"
-            accessibilityLabel="Search"
-            onPress={() => router.push("/search")}
-          />
-          <HeaderAction
-            icon="notifications-outline"
-            accessibilityLabel="Notifications"
-            onPress={() => router.push("/notifications")}
-          />
-        </View>
-      </View>
-      <View style={styles.content}>
-        <View style={styles.mapPanel}>
-          <MapView
-            ref={mapRef}
-            style={StyleSheet.absoluteFill}
-            initialRegion={initialRegion}
-            provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-            userInterfaceStyle="dark"
-            customMapStyle={
-              Platform.OS === "android" ? darkMapStyle : undefined
-            }
-            showsUserLocation={Boolean(driverLocation)}
-            showsMyLocationButton={false}
-            toolbarEnabled={false}
+    <View style={styles.screen}>
+      <MapView
+        ref={mapRef}
+        style={StyleSheet.absoluteFillObject}
+        initialRegion={initialRegion}
+        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+        userInterfaceStyle="dark"
+        mapType={Platform.OS === "ios" ? "mutedStandard" : "standard"}
+        customMapStyle={
+          Platform.OS === "android" ? androidNoxaMapStyle : undefined
+        }
+        showsUserLocation={Boolean(driverLocation)}
+        showsMyLocationButton={false}
+        showsPointsOfInterest={false}
+        showsBuildings={false}
+        showsTraffic={false}
+        showsIndoors={false}
+        showsScale={false}
+        showsCompass={false}
+        toolbarEnabled={false}
+      >
+        {events.map((event) => (
+          <Marker
+            key={event.id}
+            coordinate={{
+              latitude: event.latitude,
+              longitude: event.longitude,
+            }}
+            onPress={() => selectEvent(event)}
+            title={event.title}
           >
-            {events.map((event) => (
-              <Marker
-                key={event.id}
-                coordinate={{
-                  latitude: event.latitude,
-                  longitude: event.longitude,
-                }}
-                onPress={() => selectEvent(event)}
-                title={event.title}
-              >
-                <View
-                  style={[
-                    styles.markerDot,
-                    selectedEvent?.id === event.id && styles.markerDotSelected,
-                  ]}
-                >
-                  <Ionicons name="flag" size={14} color={colors.text} />
-                </View>
-              </Marker>
-            ))}
-          </MapView>
-          <View pointerEvents="none" style={styles.mapShade} />
-          {permissionDenied ? (
-            <View style={styles.locationNotice}>
-              <Text style={styles.locationNoticeText}>
-                Location off — centered on NOXA map.
-              </Text>
+            <View
+              style={[
+                styles.markerDot,
+                selectedEvent?.id === event.id && styles.markerDotSelected,
+              ]}
+            >
+              <Ionicons name="flag" size={14} color={colors.text} />
             </View>
-          ) : null}
+          </Marker>
+        ))}
+      </MapView>
+
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
+        <View style={[styles.header, { top: headerTop }]}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>N</Text>
+          </View>
+          <View pointerEvents="none" style={styles.logoWrap}>
+            <View style={styles.logoSpeedLine} />
+            <Text style={styles.logo}>NOXA</Text>
+          </View>
+          <View style={styles.headerActions}>
+            <HeaderAction
+              icon="search-outline"
+              accessibilityLabel="Search"
+              onPress={() => router.push("/search")}
+            />
+            <HeaderAction
+              icon="notifications-outline"
+              accessibilityLabel="Notifications"
+              onPress={() => router.push("/notifications")}
+            />
+          </View>
         </View>
-        {selectedEvent ? <EventCard event={selectedEvent} /> : null}
+
+        {permissionDenied ? (
+          <View
+            pointerEvents="none"
+            style={[styles.locationNotice, { top: headerBottom + spacing.sm }]}
+          >
+            <Text style={styles.locationNoticeText}>
+              Location off — centered on NOXA map.
+            </Text>
+          </View>
+        ) : null}
+
+        <TouchableOpacity
+          accessibilityLabel="Recenter map"
+          activeOpacity={0.78}
+          onPress={recenterMap}
+          style={[styles.recenterButton, { bottom: controlBottom }]}
+        >
+          <Ionicons name="locate" size={22} color={colors.text} />
+        </TouchableOpacity>
+
+        {selectedEvent ? (
+          <EventCard event={selectedEvent} bottomOffset={eventCardBottom} />
+        ) : null}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, overflow: "hidden", backgroundColor: "#050608" },
   header: {
-    height: 62,
+    position: "absolute",
+    left: spacing.md,
+    right: spacing.md,
+    height: 52,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.06)",
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.11)",
+    backgroundColor: "rgba(8,10,14,0.56)",
     shadowColor: "#000",
-    shadowOpacity: 0.32,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
   avatar: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
@@ -351,7 +436,6 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
     justifyContent: "center",
-    pointerEvents: "none",
   },
   logoSpeedLine: {
     width: 44,
@@ -374,30 +458,14 @@ const styles = StyleSheet.create({
   },
   headerActions: { flexDirection: "row", gap: spacing.sm },
   headerAction: {
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.13)",
     backgroundColor: "#131720",
-  },
-  content: { flex: 1, paddingHorizontal: spacing.md, paddingBottom: 112 },
-  mapPanel: {
-    flex: 1,
-    overflow: "hidden",
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    backgroundColor: "#06080D",
-    ...shadows.card,
-  },
-  mapShade: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.04)",
   },
   markerDot: {
     width: 34,
@@ -431,16 +499,32 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     fontWeight: "800",
   },
+  recenterButton: {
+    position: "absolute",
+    right: spacing.lg,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(10,12,16,0.88)",
+    shadowColor: "#000",
+    shadowOpacity: 0.24,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
   eventCard: {
     position: "absolute",
     left: spacing.lg,
     right: spacing.lg,
-    bottom: 134,
     padding: spacing.lg,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.11)",
-    backgroundColor: colors.surface,
+    backgroundColor: "rgba(10,12,16,0.9)",
     ...shadows.card,
   },
   cardKicker: {
