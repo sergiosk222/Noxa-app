@@ -41,7 +41,8 @@
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
     "@react-native-community/datetimepicker": "8.4.4",
-    "expo-location": "~19.0.8"
+    "expo-location": "~19.0.8",
+    "react-native-maps": "1.20.1"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
