@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router, type Href, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -38,23 +38,15 @@ type CurrentUserProfile = {
 type ProfileStat = {
   label: string;
   value: string | number;
-  href?: Href;
+  mode?: "followers" | "following";
 };
 
 const profileStats: ProfileStat[] = [
   { label: "Cars", value: String(currentUser.carsCount) },
   { label: "Crews", value: String(currentUser.crewsCount) },
   { label: "Events", value: String(currentUser.eventsCount) },
-  {
-    label: "Followers",
-    value: String(currentUser.followersCount),
-    href: "/social-list?tab=followers",
-  },
-  {
-    label: "Following",
-    value: String(currentUser.followingCount),
-    href: "/social-list?tab=following",
-  },
+  { label: "Followers", value: 0, mode: "followers" },
+  { label: "Following", value: 0, mode: "following" },
 ];
 
 const profile = {
@@ -211,21 +203,44 @@ function ProfileHero({
   );
 }
 
-function StatsGrid() {
+function StatsGrid({
+  profileId,
+  followersCount,
+  followingCount,
+}: {
+  profileId: string | null;
+  followersCount: number;
+  followingCount: number;
+}) {
   return (
     <Animated.View style={[styles.statsGrid, useEntryAnimation(90)]}>
       {profile.stats.map((stat) => {
-        const statHref = stat.href;
+        const mode = stat.mode;
+        const value =
+          mode === "followers"
+            ? followersCount
+            : mode === "following"
+              ? followingCount
+              : stat.value;
+        const canNavigate = Boolean(mode && profileId);
 
         return (
           <Pressable
             key={stat.label}
-            accessibilityRole={statHref ? "button" : undefined}
-            onPress={statHref ? () => router.push(statHref) : undefined}
-            style={({ pressed }) => [statHref && pressed && styles.pressed]}
+            accessibilityRole={canNavigate ? "button" : undefined}
+            onPress={
+              canNavigate
+                ? () =>
+                    router.push({
+                      pathname: "/social-list",
+                      params: { userId: profileId, mode },
+                    })
+                : undefined
+            }
+            style={({ pressed }) => [canNavigate && pressed && styles.pressed]}
           >
             <NoxaCard>
-              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statValue}>{value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </NoxaCard>
           </Pressable>
@@ -312,6 +327,8 @@ export default function ProfileScreen() {
   );
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   const loadProfile = useCallback(async () => {
     setIsProfileLoading(true);
@@ -327,13 +344,24 @@ export default function ProfileScreen() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, display_name, username, avatar_url, bio, city")
-      .eq("id", user.id)
-      .single();
+    const [{ data, error }, followersResult, followingResult] =
+      await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_url, bio, city")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("follows")
+          .select("follower_id", { count: "exact", head: true })
+          .eq("following_id", user.id),
+        supabase
+          .from("follows")
+          .select("following_id", { count: "exact", head: true })
+          .eq("follower_id", user.id),
+      ]);
 
-    if (error) {
+    if (error || followersResult.error || followingResult.error) {
       setProfileData(null);
       setProfileError("Unable to load profile.");
       setIsProfileLoading(false);
@@ -341,6 +369,8 @@ export default function ProfileScreen() {
     }
 
     setProfileData(data);
+    setFollowersCount(followersResult.count ?? 0);
+    setFollowingCount(followingResult.count ?? 0);
     setIsProfileLoading(false);
   }, []);
 
@@ -406,7 +436,11 @@ export default function ProfileScreen() {
           errorMessage={profileError}
           onRetry={loadProfile}
         />
-        <StatsGrid />
+        <StatsGrid
+          profileId={profileData?.id ?? null}
+          followersCount={followersCount}
+          followingCount={followingCount}
+        />
         <AchievementsCard />
         <RecentActivityCard />
         <QuickActionsCard />

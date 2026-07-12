@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -111,6 +112,11 @@ export default function PublicDriverProfileScreen() {
   const [vehicles, setVehicles] = useState<PublicVehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   const loadDriverProfile = useCallback(async () => {
     if (!isValidDriverId) {
@@ -123,6 +129,10 @@ export default function PublicDriverProfileScreen() {
 
     setIsLoading(true);
     setErrorMessage(null);
+
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id ?? null;
+    setCurrentUserId(userId);
 
     const { data: profileData, error: profileError } = await supabase
       .from("profiles")
@@ -145,9 +155,43 @@ export default function PublicDriverProfileScreen() {
       return;
     }
 
+    const [followersResult, followingResult, relationshipResult] =
+      await Promise.all([
+        supabase
+          .from("follows")
+          .select("follower_id", { count: "exact", head: true })
+          .eq("following_id", driverId),
+        supabase
+          .from("follows")
+          .select("following_id", { count: "exact", head: true })
+          .eq("follower_id", driverId),
+        userId && userId !== driverId
+          ? supabase
+              .from("follows")
+              .select("follower_id")
+              .eq("follower_id", userId)
+              .eq("following_id", driverId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+    setFollowersCount(followersResult.count ?? 0);
+    setFollowingCount(followingResult.count ?? 0);
+    setIsFollowing(Boolean(relationshipResult.data));
+
+    if (
+      followersResult.error ||
+      followingResult.error ||
+      relationshipResult.error
+    ) {
+      setErrorMessage("Driver loaded, but social details could not be loaded.");
+    }
+
     const { data: vehicleData, error: vehicleError } = await supabase
       .from("vehicles")
-      .select("id, brand, model, year, horsepower, color, cover_image_url, is_public")
+      .select(
+        "id, brand, model, year, horsepower, color, cover_image_url, is_public",
+      )
       .eq("owner_id", driverId)
       .eq("is_public", true)
       .order("created_at", { ascending: false });
@@ -155,7 +199,9 @@ export default function PublicDriverProfileScreen() {
     if (vehicleError) {
       setProfile(profileData);
       setVehicles([]);
-      setErrorMessage("Driver loaded, but public vehicles could not be loaded.");
+      setErrorMessage(
+        "Driver loaded, but public vehicles could not be loaded.",
+      );
       setIsLoading(false);
       return;
     }
@@ -169,9 +215,97 @@ export default function PublicDriverProfileScreen() {
     void loadDriverProfile();
   }, [loadDriverProfile]);
 
+  const refreshFollowDetails = useCallback(async () => {
+    if (!isValidDriverId || !profile) {
+      return;
+    }
+
+    const [followersResult, followingResult, relationshipResult] =
+      await Promise.all([
+        supabase
+          .from("follows")
+          .select("follower_id", { count: "exact", head: true })
+          .eq("following_id", profile.id),
+        supabase
+          .from("follows")
+          .select("following_id", { count: "exact", head: true })
+          .eq("follower_id", profile.id),
+        currentUserId && currentUserId !== profile.id
+          ? supabase
+              .from("follows")
+              .select("follower_id")
+              .eq("follower_id", currentUserId)
+              .eq("following_id", profile.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+
+    if (
+      followersResult.error ||
+      followingResult.error ||
+      relationshipResult.error
+    ) {
+      Alert.alert("Social update failed", "Unable to refresh follow details.");
+      return;
+    }
+
+    setFollowersCount(followersResult.count ?? 0);
+    setFollowingCount(followingResult.count ?? 0);
+    setIsFollowing(Boolean(relationshipResult.data));
+  }, [currentUserId, isValidDriverId, profile]);
+
+  const toggleFollow = useCallback(async () => {
+    if (
+      !currentUserId ||
+      !profile ||
+      currentUserId === profile.id ||
+      isFollowLoading
+    ) {
+      return;
+    }
+
+    setIsFollowLoading(true);
+
+    const { error } = isFollowing
+      ? await supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", currentUserId)
+          .eq("following_id", profile.id)
+      : await supabase.from("follows").insert({
+          follower_id: currentUserId,
+          following_id: profile.id,
+        });
+
+    if (error) {
+      Alert.alert(
+        isFollowing ? "Unfollow failed" : "Follow failed",
+        "NOXA could not update this follow relationship. Please try again.",
+      );
+      setIsFollowLoading(false);
+      return;
+    }
+
+    await refreshFollowDetails();
+    setIsFollowLoading(false);
+  }, [
+    currentUserId,
+    isFollowLoading,
+    isFollowing,
+    profile,
+    refreshFollowDetails,
+  ]);
+
   const displayName = profile?.display_name?.trim() || "NOXA Driver";
   const username = profile?.username ? `@${profile.username}` : null;
-  const stats = [{ label: "Cars", value: vehicles.length }];
+  const canFollow = Boolean(
+    currentUserId && profile && currentUserId !== profile.id,
+  );
+  const stats = [
+    { label: "Cars", value: vehicles.length },
+    { label: "Followers", value: followersCount, mode: "followers" as const },
+    { label: "Following", value: followingCount, mode: "following" as const },
+  ];
 
   return (
     <NoxaScreen padded={false}>
@@ -211,21 +345,60 @@ export default function PublicDriverProfileScreen() {
             <View style={styles.heroCard}>
               <View style={styles.heroGlow} />
               {profile.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+                <Image
+                  source={{ uri: profile.avatar_url }}
+                  style={styles.avatar}
+                />
               ) : (
                 <View style={styles.avatarFallback}>
-                  <Text style={styles.avatarInitials}>{getInitials(displayName)}</Text>
+                  <Text style={styles.avatarInitials}>
+                    {getInitials(displayName)}
+                  </Text>
                 </View>
               )}
               <View style={styles.nameRow}>
                 <Text style={styles.name}>{displayName}</Text>
               </View>
-              {username ? <Text style={styles.username}>{username}</Text> : null}
-              {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+              {username ? (
+                <Text style={styles.username}>{username}</Text>
+              ) : null}
+              {profile.bio ? (
+                <Text style={styles.bio}>{profile.bio}</Text>
+              ) : null}
+              {canFollow ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isFollowLoading}
+                  onPress={toggleFollow}
+                  style={({ pressed }) => [
+                    styles.followButton,
+                    isFollowing && styles.followingButton,
+                    pressed && !isFollowLoading && styles.pressed,
+                    isFollowLoading && styles.followButtonDisabled,
+                  ]}
+                >
+                  {isFollowLoading ? (
+                    <ActivityIndicator color={colors.text} />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.followButtonText,
+                        isFollowing && styles.followingButtonText,
+                      ]}
+                    >
+                      {isFollowing ? "Following" : "Follow"}
+                    </Text>
+                  )}
+                </Pressable>
+              ) : null}
               {profile.city ? (
                 <View style={styles.metaRow}>
                   <View style={styles.metaPill}>
-                    <Ionicons name="location-outline" size={14} color={colors.accent} />
+                    <Ionicons
+                      name="location-outline"
+                      size={14}
+                      color={colors.accent}
+                    />
                     <Text style={styles.metaText}>{profile.city}</Text>
                   </View>
                 </View>
@@ -233,16 +406,49 @@ export default function PublicDriverProfileScreen() {
             </View>
 
             <View style={styles.statsCard}>
-              {stats.map((stat) => (
-                <View key={stat.label} style={styles.statItem}>
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              ))}
+              {stats.map((stat) => {
+                const content = (
+                  <>
+                    <Text style={styles.statValue}>{stat.value}</Text>
+                    <Text style={styles.statLabel}>{stat.label}</Text>
+                  </>
+                );
+
+                if (stat.label === "Cars") {
+                  return (
+                    <View key={stat.label} style={styles.statItem}>
+                      {content}
+                    </View>
+                  );
+                }
+
+                return (
+                  <Pressable
+                    key={stat.label}
+                    accessibilityRole="button"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/social-list",
+                        params: { userId: profile.id, mode: stat.mode },
+                      })
+                    }
+                    style={({ pressed }) => [
+                      styles.statItem,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    {content}
+                  </Pressable>
+                );
+              })}
             </View>
 
             {errorMessage ? (
-              <StateCard title="Garage warning" message={errorMessage} onRetry={loadDriverProfile} />
+              <StateCard
+                title="Garage warning"
+                message={errorMessage}
+                onRetry={loadDriverProfile}
+              />
             ) : null}
 
             {vehicles.length > 0 ? (
@@ -269,20 +475,33 @@ export default function PublicDriverProfileScreen() {
                       ]}
                     >
                       {vehicle.cover_image_url ? (
-                        <Image source={{ uri: vehicle.cover_image_url }} style={styles.carImage} />
+                        <Image
+                          source={{ uri: vehicle.cover_image_url }}
+                          style={styles.carImage}
+                        />
                       ) : (
                         <View style={styles.carImageFallback}>
-                          <Ionicons name="car-sport-outline" size={42} color={colors.textMuted} />
+                          <Ionicons
+                            name="car-sport-outline"
+                            size={42}
+                            color={colors.textMuted}
+                          />
                         </View>
                       )}
                       <View style={styles.carShade} />
                       <View style={styles.carCopy}>
-                        <Text style={styles.carName}>{vehicleName(vehicle)}</Text>
+                        <Text style={styles.carName}>
+                          {vehicleName(vehicle)}
+                        </Text>
                         <View style={styles.carMetaRow}>
                           {vehicle.horsepower ? (
-                            <Text style={styles.carPill}>{vehicle.horsepower} HP</Text>
+                            <Text style={styles.carPill}>
+                              {vehicle.horsepower} HP
+                            </Text>
                           ) : null}
-                          {vehicle.color ? <Text style={styles.carPill}>{vehicle.color}</Text> : null}
+                          {vehicle.color ? (
+                            <Text style={styles.carPill}>{vehicle.color}</Text>
+                          ) : null}
                         </View>
                       </View>
                     </Pressable>
@@ -433,6 +652,30 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 22,
   },
+  followButton: {
+    marginTop: spacing.lg,
+    minWidth: 136,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    ...shadows.redGlow,
+  },
+  followingButton: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceSoft,
+    shadowOpacity: 0,
+  },
+  followButtonDisabled: { opacity: 0.7 },
+  followButtonText: {
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: "900",
+  },
+  followingButtonText: { color: colors.textMuted },
   metaRow: {
     width: "100%",
     marginTop: spacing.lg,
