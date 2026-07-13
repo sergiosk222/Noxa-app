@@ -12,13 +12,16 @@ const corsHeaders = {
 
 type RoutePoint = { latitude: number; longitude: number };
 
-type MapboxRouteResponse = {
-  routes?: Array<{
-    distance?: number;
-    duration?: number;
+type OpenRouteServiceRouteResponse = {
+  features?: Array<{
     geometry?: { coordinates?: unknown };
+    properties?: {
+      summary?: {
+        distance?: unknown;
+        duration?: unknown;
+      };
+    };
   }>;
-  message?: string;
 };
 
 function json(body: Record<string, unknown>, status = 200) {
@@ -78,13 +81,13 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const mapboxToken = Deno.env.get("MAPBOX_ACCESS_TOKEN");
+  const openRouteServiceApiKey = Deno.env.get("OPENROUTESERVICE_API_KEY");
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return json({ error: "Server configuration is missing." }, 500);
   }
 
-  if (!mapboxToken) {
+  if (!openRouteServiceApiKey) {
     return json({ error: "Route provider is not configured." }, 500);
   }
 
@@ -121,44 +124,56 @@ Deno.serve(async (req) => {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
-  const url = new URL(
-    `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`,
-  );
-  url.searchParams.set("geometries", "geojson");
-  url.searchParams.set("overview", "full");
-  url.searchParams.set("steps", "false");
-  url.searchParams.set("access_token", mapboxToken);
 
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(
+      "https://api.openrouteservice.org/v2/directions/driving-car/geojson",
+      {
+        method: "POST",
+        headers: {
+          Authorization: openRouteServiceApiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json, application/geo+json",
+        },
+        body: JSON.stringify({
+          coordinates: [
+            [origin.longitude, origin.latitude],
+            [destination.longitude, destination.latitude],
+          ],
+        }),
+        signal: controller.signal,
+      },
+    );
     const data = (await response
       .json()
-      .catch(() => ({}))) as MapboxRouteResponse;
+      .catch(() => ({}))) as OpenRouteServiceRouteResponse;
 
     if (!response.ok) {
       return json(
         { error: "Route provider request failed." },
-        response.status >= 500 ? 502 : 400,
+        response.status === 429 ? 429 : response.status >= 500 ? 502 : 400,
       );
     }
 
-    const route = data.routes?.[0];
-    const coordinates = normalizeCoordinates(route?.geometry?.coordinates);
+    const feature = data.features?.[0];
+    const coordinates = normalizeCoordinates(feature?.geometry?.coordinates);
+    const distance = feature?.properties?.summary?.distance;
+    const duration = feature?.properties?.summary?.duration;
     if (
-      !route ||
+      !feature ||
       !coordinates ||
-      typeof route.distance !== "number" ||
-      typeof route.duration !== "number" ||
-      !Number.isFinite(route.distance) ||
-      !Number.isFinite(route.duration)
+      typeof distance !== "number" ||
+      typeof duration !== "number" ||
+      !Number.isFinite(distance) ||
+      !Number.isFinite(duration)
     ) {
       return json({ error: "No route found." }, 404);
     }
 
     return json({
       coordinates,
-      distanceMeters: route.distance,
-      durationSeconds: route.duration,
+      distanceMeters: distance,
+      durationSeconds: duration,
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
