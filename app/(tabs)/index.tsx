@@ -4,6 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   Switch,
   StyleSheet,
@@ -52,6 +53,13 @@ type EventMarkerRow = {
   longitude: number;
 };
 type LatLng = { latitude: number; longitude: number };
+type PresenceLocationPayload = {
+  latitude: number;
+  longitude: number;
+  heading: number | null;
+  speed_mps: number | null;
+  accuracy_meters: number | null;
+};
 type RouteResult = {
   coordinates: LatLng[];
   distanceMeters: number;
@@ -69,6 +77,7 @@ const THESSALONIKI: LatLng = { latitude: 40.6401, longitude: 22.9444 };
 const DEFAULT_DELTA = { latitudeDelta: 0.075, longitudeDelta: 0.075 };
 const ACTIVE_DRIVER_WINDOW_MS = 2 * 60 * 1000;
 const DRIVER_LOCATION_MIN_WRITE_MS = 7000;
+const DRIVER_PRESENCE_HEARTBEAT_MS = 45 * 1000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -383,9 +392,15 @@ export default function LiveMapScreen() {
   const routeRequestKeyRef = useRef<string | null>(null);
   const routeRequestIdRef = useRef(0);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const isMountedRef = useRef(true);
+  const isAppForegroundRef = useRef(AppState.currentState === "active");
   const sharingUserIdRef = useRef<string | null>(null);
+  const latestPresencePayloadRef = useRef<PresenceLocationPayload | null>(null);
   const lastPresenceWriteRef = useRef(0);
+  const presenceWriteQueueRef = useRef(Promise.resolve());
   const activeDriversRequestIdRef = useRef(0);
   const activeDriversRefreshInFlightRef = useRef(false);
   const activeDriversRefreshQueuedRef = useRef(false);
@@ -445,6 +460,13 @@ export default function LiveMapScreen() {
     return point;
   }, []);
 
+  const clearPresenceHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
   const deletePresence = useCallback(async (userId?: string | null) => {
     const id = userId ?? sharingUserIdRef.current;
     if (!id) return;
@@ -455,7 +477,9 @@ export default function LiveMapScreen() {
     async (deleteRow = true) => {
       locationWatcherRef.current?.remove();
       locationWatcherRef.current = null;
+      clearPresenceHeartbeat();
       lastPresenceWriteRef.current = 0;
+      latestPresencePayloadRef.current = null;
       const userId = sharingUserIdRef.current;
       sharingUserIdRef.current = null;
       if (isMountedRef.current) {
@@ -466,14 +490,46 @@ export default function LiveMapScreen() {
         await deletePresence(userId).catch(() => undefined);
       }
     },
-    [deletePresence],
+    [clearPresenceHeartbeat, deletePresence],
+  );
+
+  const writePresencePayload = useCallback(
+    (userId: string, payload: PresenceLocationPayload, force = false) => {
+      const nowMs = Date.now();
+      if (
+        !force &&
+        nowMs - lastPresenceWriteRef.current < DRIVER_LOCATION_MIN_WRITE_MS
+      )
+        return presenceWriteQueueRef.current;
+
+      lastPresenceWriteRef.current = nowMs;
+      const write = presenceWriteQueueRef.current.then(async () => {
+        if (!isMountedRef.current || sharingUserIdRef.current !== userId)
+          return;
+        const { error } = await supabase.from("driver_locations").upsert(
+          {
+            user_id: userId,
+            ...payload,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" },
+        );
+        if (error) {
+          lastPresenceWriteRef.current = 0;
+          if (isMountedRef.current)
+            setSharingError("Could not update visibility. Retrying soon.");
+          return;
+        }
+        if (isMountedRef.current) setSharingError(null);
+      });
+      presenceWriteQueueRef.current = write.catch(() => undefined);
+      return presenceWriteQueueRef.current;
+    },
+    [],
   );
 
   const upsertPresence = useCallback(
-    async (userId: string, coords: Location.LocationObjectCoords) => {
-      const nowMs = Date.now();
-      if (nowMs - lastPresenceWriteRef.current < DRIVER_LOCATION_MIN_WRITE_MS)
-        return;
+    (userId: string, coords: Location.LocationObjectCoords) => {
       const latitude = finiteOrNull(coords.latitude);
       const longitude = finiteOrNull(coords.longitude);
       if (
@@ -485,30 +541,35 @@ export default function LiveMapScreen() {
       const heading = finiteOrNull(coords.heading);
       const speed = finiteOrNull(coords.speed);
       const accuracy = finiteOrNull(coords.accuracy);
-      const payload = {
-        user_id: userId,
+      const payload: PresenceLocationPayload = {
         latitude,
         longitude,
         heading:
           heading !== null && heading >= 0 && heading < 360 ? heading : null,
         speed_mps: speed !== null && speed >= 0 ? speed : null,
         accuracy_meters: accuracy !== null && accuracy >= 0 ? accuracy : null,
-        updated_at: new Date().toISOString(),
       };
-      lastPresenceWriteRef.current = nowMs;
-      const { error } = await supabase
-        .from("driver_locations")
-        .upsert(payload, { onConflict: "user_id" });
-      if (error) {
-        lastPresenceWriteRef.current = 0;
-        if (isMountedRef.current)
-          setSharingError("Could not update visibility. Retrying soon.");
-        return;
-      }
-      if (isMountedRef.current) setSharingError(null);
+      latestPresencePayloadRef.current = payload;
+      void writePresencePayload(userId, payload);
     },
-    [],
+    [writePresencePayload],
   );
+
+  const startPresenceHeartbeat = useCallback(() => {
+    if (heartbeatIntervalRef.current) return;
+    if (
+      !isAppForegroundRef.current ||
+      !sharingUserIdRef.current ||
+      !latestPresencePayloadRef.current
+    )
+      return;
+    heartbeatIntervalRef.current = setInterval(() => {
+      const userId = sharingUserIdRef.current;
+      const payload = latestPresencePayloadRef.current;
+      if (!isAppForegroundRef.current || !userId || !payload) return;
+      void writePresencePayload(userId, payload, true);
+    }, DRIVER_PRESENCE_HEARTBEAT_MS);
+  }, [writePresencePayload]);
 
   const startSharing = useCallback(async () => {
     setSharingError(null);
@@ -538,7 +599,8 @@ export default function LiveMapScreen() {
         (position) => {
           if (!isMountedRef.current || sharingUserIdRef.current !== userId)
             return;
-          void upsertPresence(userId, position.coords);
+          upsertPresence(userId, position.coords);
+          startPresenceHeartbeat();
         },
       );
       locationWatcherRef.current = watcher;
@@ -550,7 +612,7 @@ export default function LiveMapScreen() {
         setSharingError("Could not start temporary map visibility.");
       }
     }
-  }, [upsertPresence]);
+  }, [startPresenceHeartbeat, upsertPresence]);
 
   const toggleVisibility = useCallback(
     (enabled: boolean) => {
@@ -634,9 +696,11 @@ export default function LiveMapScreen() {
   useEffect(() => {
     isMountedRef.current = true;
     void refreshActiveDrivers();
-    const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") void stopSharing(true);
-    });
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT" || !session) void stopSharing(true);
+      },
+    );
     const channel = supabase
       .channel("driver-locations-map")
       .on(
@@ -657,13 +721,29 @@ export default function LiveMapScreen() {
       activeDriversRequestIdRef.current += 1;
       locationWatcherRef.current?.remove();
       locationWatcherRef.current = null;
+      clearPresenceHeartbeat();
+      latestPresencePayloadRef.current = null;
       const userId = sharingUserIdRef.current;
       sharingUserIdRef.current = null;
       void deletePresence(userId).catch(() => undefined);
       void supabase.removeChannel(channel);
       authListener.subscription.unsubscribe();
     };
-  }, [deletePresence, refreshActiveDrivers, stopSharing]);
+  }, [
+    clearPresenceHeartbeat,
+    deletePresence,
+    refreshActiveDrivers,
+    stopSharing,
+  ]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      isAppForegroundRef.current = nextState === "active";
+      if (nextState === "active") startPresenceHeartbeat();
+      else clearPresenceHeartbeat();
+    });
+    return () => subscription.remove();
+  }, [clearPresenceHeartbeat, startPresenceHeartbeat]);
 
   useFocusEffect(
     useCallback(() => {
