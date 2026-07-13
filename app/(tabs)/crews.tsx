@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
@@ -136,30 +136,55 @@ function CrewDots({ dots }: { dots: readonly string[] }) {
 }
 
 function CrewCard({ crew, index, busy, onJoin, onLeave }: { crew: Crew; index: number; busy: boolean; onJoin: (crew: Crew) => void; onLeave: (crew: Crew) => void }) {
+  const canNavigate = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(crew.id);
   const actionLabel = crew.currentUserRole === 'owner' ? 'Owner' : crew.isCurrentUserMember ? 'Leave' : crew.is_public ? 'Join' : 'Private';
   const canPress = !busy && (actionLabel === 'Join' || actionLabel === 'Leave');
 
   return (
     <Animated.View style={[styles.crewCard, useSlideUp(210 + index * 70)]}>
       <View style={styles.redAccent} />
-      <View style={styles.crewHeader}>
-        <View style={styles.crewTitleBlock}>
-          <Text style={styles.crewName}>{crew.name}</Text>
-          <View style={styles.metaRow}>
-            <Ionicons name="location-outline" size={16} color={colors.textMuted} />
-            <Text style={styles.metaText}>{crew.city ?? 'No city set'}</Text>
+      <Pressable
+        accessibilityLabel={`Open ${crew.name} crew details`}
+        accessibilityRole="button"
+        disabled={!canNavigate}
+        onPress={() => {
+          if (canNavigate) {
+            router.push({ pathname: '/crew/[id]', params: { id: crew.id } });
+          }
+        }}
+        style={({ pressed }) => [styles.crewMainPress, pressed && styles.pressed]}
+      >
+        <View style={styles.crewHeader}>
+          <View style={styles.crewTitleBlock}>
+            <Text style={styles.crewName}>{crew.name}</Text>
+            <View style={styles.metaRow}>
+              <Ionicons name="location-outline" size={16} color={colors.textMuted} />
+              <Text style={styles.metaText}>{crew.city ?? 'No city set'}</Text>
+            </View>
+            <Text style={styles.descriptionText}>{crew.description ?? `Owned by ${crew.ownerName}`}</Text>
           </View>
-          <Text style={styles.descriptionText}>{crew.description ?? `Owned by ${crew.ownerName}`}</Text>
+          <NoxaBadge label={crew.is_public ? 'PUBLIC' : 'PRIVATE'} variant={crew.is_public ? 'primary' : 'default'} />
         </View>
-        <NoxaBadge label={crew.is_public ? 'PUBLIC' : 'PRIVATE'} variant={crew.is_public ? 'primary' : 'default'} />
-      </View>
+      </Pressable>
 
       <View style={styles.crewFooter}>
-        <CrewDots dots={crew.dots} />
-        <View style={styles.memberCountRow}>
-          <Ionicons name="people-outline" size={16} color={colors.textMuted} />
-          <Text style={styles.metaText}>{crew.memberCount} members</Text>
-        </View>
+        <Pressable
+          accessibilityLabel={`Open ${crew.name} crew details`}
+          accessibilityRole="button"
+          disabled={!canNavigate}
+          onPress={() => {
+            if (canNavigate) {
+              router.push({ pathname: '/crew/[id]', params: { id: crew.id } });
+            }
+          }}
+          style={({ pressed }) => [styles.crewFooterPress, pressed && styles.pressed]}
+        >
+          <CrewDots dots={crew.dots} />
+          <View style={styles.memberCountRow}>
+            <Ionicons name="people-outline" size={16} color={colors.textMuted} />
+            <Text style={styles.metaText}>{crew.memberCount} members</Text>
+          </View>
+        </Pressable>
         <Pressable accessibilityRole="button" disabled={!canPress} onPress={() => (actionLabel === 'Join' ? onJoin(crew) : onLeave(crew))} style={({ pressed }) => [styles.memberAction, !canPress && styles.memberActionDisabled, pressed && styles.pressed]}>
           {busy ? <ActivityIndicator size="small" color={colors.text} /> : <Text style={styles.memberActionText}>{actionLabel}</Text>}
         </Pressable>
@@ -432,6 +457,8 @@ const styles = StyleSheet.create({
   sectionMeta: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
   crewCard: { overflow: 'hidden', padding: spacing.lg, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: spacing.md, ...shadows.card },
   redAccent: { position: 'absolute', left: 0, top: spacing.lg, bottom: spacing.lg, width: 3, borderTopRightRadius: radius.pill, borderBottomRightRadius: radius.pill, backgroundColor: colors.primary },
+  crewMainPress: { borderRadius: radius.button },
+  crewFooterPress: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   crewHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   crewTitleBlock: { flex: 1, gap: spacing.xs },
   crewName: { color: colors.text, fontSize: typography.cardTitle, fontWeight: '900', letterSpacing: -0.2 },
