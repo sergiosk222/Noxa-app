@@ -3,6 +3,7 @@ import * as Location from "expo-location";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Platform,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, {
   Marker,
+  Polyline,
   PROVIDER_GOOGLE,
   type MapViewProps,
   type Region,
@@ -29,6 +31,12 @@ type EventMarkerRow = {
   longitude: number;
 };
 type LatLng = { latitude: number; longitude: number };
+type RouteResult = {
+  coordinates: LatLng[];
+  distanceMeters: number;
+  durationSeconds: number;
+};
+type RouteStatus = "idle" | "loading" | "ready" | "error";
 
 type ActionButtonProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -142,6 +150,39 @@ function formatEventTime(value: string) {
   }).format(date);
 }
 
+function normalizeParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function hasValidCoordinates(
+  event: EventMarkerRow | null,
+): event is EventMarkerRow {
+  return Boolean(
+    event &&
+    Number.isFinite(event.latitude) &&
+    Number.isFinite(event.longitude) &&
+    event.latitude >= -90 &&
+    event.latitude <= 90 &&
+    event.longitude >= -180 &&
+    event.longitude <= 180,
+  );
+}
+
+function formatDistance(meters: number) {
+  if (!Number.isFinite(meters)) return "—";
+  if (meters < 1000) return `${Math.max(0, Math.round(meters))} m`;
+  return `${(meters / 1000).toFixed(meters < 10000 ? 1 : 0)} km`;
+}
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds)) return "—";
+  const totalMinutes = Math.max(1, Math.round(seconds / 60));
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours} hr ${String(minutes).padStart(2, "0")} min`;
+}
+
 function EventCard({
   event,
   bottomOffset,
@@ -173,10 +214,79 @@ function EventCard({
   );
 }
 
+function RouteCard({
+  event,
+  route,
+  status,
+  message,
+  bottomOffset,
+  onClose,
+  onRetry,
+}: {
+  event: EventMarkerRow;
+  route: RouteResult | null;
+  status: RouteStatus;
+  message: string | null;
+  bottomOffset: number;
+  onClose: () => void;
+  onRetry: () => void;
+}) {
+  const loading = status === "loading";
+  return (
+    <View style={[styles.routeCard, { bottom: bottomOffset }]}>
+      <View style={styles.routeHeader}>
+        <View style={styles.routeTitleWrap}>
+          <Text style={styles.cardKicker}>NOXA route</Text>
+          <Text style={styles.routeTitle} numberOfLines={1}>
+            {event.title}
+          </Text>
+        </View>
+        <TouchableOpacity
+          accessibilityLabel="Exit route mode"
+          activeOpacity={0.78}
+          onPress={onClose}
+          style={styles.routeCloseButton}
+        >
+          <Ionicons name="close" size={18} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+      {loading ? (
+        <View style={styles.routeStatusRow}>
+          <ActivityIndicator color={colors.primary} size="small" />
+          <Text style={styles.routeStatusText}>Building road route…</Text>
+        </View>
+      ) : route ? (
+        <View style={styles.routeMetrics}>
+          <Text style={styles.routeMetric}>
+            {formatDistance(route.distanceMeters)}
+          </Text>
+          <Text style={styles.routeMetricMuted}>•</Text>
+          <Text style={styles.routeMetric}>
+            ~{formatDuration(route.durationSeconds)}
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.routeStatusText}>
+          {message ?? "Route unavailable. Keep exploring the NOXA map."}
+        </Text>
+      )}
+      {status === "error" ? (
+        <TouchableOpacity
+          activeOpacity={0.82}
+          onPress={onRetry}
+          style={styles.routeRetryButton}
+        >
+          <Text style={styles.routeRetryText}>Retry route</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+}
+
 export default function LiveMapScreen() {
   const params = useLocalSearchParams<{
-    focusEventId?: string;
-    mapMode?: string;
+    focusEventId?: string | string[];
+    mapMode?: string | string[];
   }>();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView | null>(null);
@@ -186,17 +296,44 @@ export default function LiveMapScreen() {
   const [selectedEvent, setSelectedEvent] = useState<EventMarkerRow | null>(
     null,
   );
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const [routeStatus, setRouteStatus] = useState<RouteStatus>("idle");
+  const [routeMessage, setRouteMessage] = useState<string | null>(null);
+  const routeRequestKeyRef = useRef<string | null>(null);
+  const routeRequestIdRef = useRef(0);
+  const normalizedFocusEventId = normalizeParam(params.focusEventId);
+  const normalizedMapMode = normalizeParam(params.mapMode);
   const focusEventId =
-    typeof params.focusEventId === "string" &&
-    uuidPattern.test(params.focusEventId)
-      ? params.focusEventId
+    typeof normalizedFocusEventId === "string" &&
+    uuidPattern.test(normalizedFocusEventId)
+      ? normalizedFocusEventId
       : null;
+  const isRouteMode = normalizedMapMode === "route" && Boolean(focusEventId);
 
   const initialRegion = useMemo(() => pointRegion(THESSALONIKI), []);
 
   const animateTo = useCallback(
     (region: Region) => mapRef.current?.animateToRegion(region, 550),
     [],
+  );
+
+  const fitRouteToMap = useCallback(
+    (coordinates: LatLng[], destination: LatLng) => {
+      const points = driverLocation
+        ? [driverLocation, ...coordinates, destination]
+        : [...coordinates, destination];
+      if (points.length < 2) return;
+      mapRef.current?.fitToCoordinates(points, {
+        animated: true,
+        edgePadding: {
+          top: insets.top + 96,
+          right: spacing.xl,
+          bottom: insets.bottom + TAB_BAR_HEIGHT + 190,
+          left: spacing.xl,
+        },
+      });
+    },
+    [driverLocation, insets.bottom, insets.top],
   );
 
   const loadDriverLocation = useCallback(async () => {
@@ -257,7 +394,7 @@ export default function LiveMapScreen() {
           : null;
         if (focused) {
           setSelectedEvent(focused);
-          animateTo(eventRegion(focused));
+          if (!isRouteMode) animateTo(eventRegion(focused));
           return;
         }
         if (point) animateTo(pointRegion(point));
@@ -267,7 +404,7 @@ export default function LiveMapScreen() {
       return () => {
         isActive = false;
       };
-    }, [animateTo, focusEventId, loadDriverLocation, loadEvents]),
+    }, [animateTo, focusEventId, isRouteMode, loadDriverLocation, loadEvents]),
   );
 
   useEffect(() => {
@@ -275,9 +412,104 @@ export default function LiveMapScreen() {
     const focused = events.find((event) => event.id === focusEventId);
     if (focused) {
       setSelectedEvent(focused);
-      animateTo(eventRegion(focused));
+      if (!isRouteMode) animateTo(eventRegion(focused));
     }
-  }, [animateTo, events, focusEventId]);
+  }, [animateTo, events, focusEventId, isRouteMode]);
+
+  useEffect(() => {
+    setRoute(null);
+    setRouteMessage(null);
+    setRouteStatus("idle");
+    routeRequestKeyRef.current = null;
+  }, [focusEventId, isRouteMode]);
+
+  const requestRoute = useCallback(async () => {
+    if (!isRouteMode || !focusEventId || !hasValidCoordinates(selectedEvent))
+      return;
+    if (!driverLocation) {
+      setRoute(null);
+      setRouteStatus("error");
+      setRouteMessage(
+        permissionDenied
+          ? "Location permission is off. Enable location to route on NOXA."
+          : "Current location is needed to build this route.",
+      );
+      return;
+    }
+
+    const requestKey = `${focusEventId}:${driverLocation.latitude.toFixed(5)},${driverLocation.longitude.toFixed(5)}:${selectedEvent.latitude.toFixed(5)},${selectedEvent.longitude.toFixed(5)}`;
+    if (routeStatus === "loading" || routeRequestKeyRef.current === requestKey)
+      return;
+
+    const requestId = routeRequestIdRef.current + 1;
+    routeRequestIdRef.current = requestId;
+    routeRequestKeyRef.current = requestKey;
+    setRoute(null);
+    setRouteStatus("loading");
+    setRouteMessage(null);
+
+    const { data, error } = await supabase.functions.invoke<RouteResult>(
+      "event-route",
+      {
+        body: {
+          origin: driverLocation,
+          destination: {
+            latitude: selectedEvent.latitude,
+            longitude: selectedEvent.longitude,
+          },
+        },
+      },
+    );
+
+    if (routeRequestIdRef.current !== requestId) return;
+
+    if (error || !data || data.coordinates.length < 2) {
+      routeRequestKeyRef.current = null;
+      setRoute(null);
+      setRouteStatus("error");
+      setRouteMessage(error?.message ?? "Route could not be built right now.");
+      return;
+    }
+
+    setRoute(data);
+    setRouteStatus("ready");
+    fitRouteToMap(data.coordinates, {
+      latitude: selectedEvent.latitude,
+      longitude: selectedEvent.longitude,
+    });
+  }, [
+    driverLocation,
+    fitRouteToMap,
+    focusEventId,
+    isRouteMode,
+    permissionDenied,
+    routeStatus,
+    selectedEvent,
+  ]);
+
+  useEffect(() => {
+    void requestRoute();
+  }, [requestRoute]);
+
+  useEffect(() => {
+    return () => {
+      routeRequestIdRef.current += 1;
+    };
+  }, []);
+
+  const closeRouteMode = useCallback(() => {
+    routeRequestIdRef.current += 1;
+    routeRequestKeyRef.current = null;
+    setRoute(null);
+    setRouteStatus("idle");
+    setRouteMessage(null);
+    router.setParams({ mapMode: undefined, focusEventId: undefined });
+  }, []);
+
+  const retryRoute = useCallback(() => {
+    routeRequestKeyRef.current = null;
+    void requestRoute();
+  }, [requestRoute]);
 
   const selectEvent = useCallback(
     (event: EventMarkerRow) => {
@@ -297,7 +529,10 @@ export default function LiveMapScreen() {
   const headerBottom = headerTop + 52;
   const eventCardBottom =
     insets.bottom + TAB_BAR_BOTTOM_GAP + TAB_BAR_HEIGHT + FLOATING_GAP;
-  const controlBottom = eventCardBottom + (selectedEvent ? 188 : spacing.md);
+  const routeCardBottom = eventCardBottom;
+  const controlBottom =
+    eventCardBottom +
+    (isRouteMode && selectedEvent ? 168 : selectedEvent ? 188 : spacing.md);
 
   return (
     <View style={styles.screen}>
@@ -321,6 +556,24 @@ export default function LiveMapScreen() {
         showsCompass={false}
         toolbarEnabled={false}
       >
+        {route ? (
+          <>
+            <Polyline
+              coordinates={route.coordinates}
+              strokeColor="rgba(31,6,8,0.78)"
+              strokeWidth={9}
+              lineCap="round"
+              lineJoin="round"
+            />
+            <Polyline
+              coordinates={route.coordinates}
+              strokeColor={colors.primary}
+              strokeWidth={5}
+              lineCap="round"
+              lineJoin="round"
+            />
+          </>
+        ) : null}
         {events.map((event) => (
           <Marker
             key={event.id}
@@ -386,7 +639,17 @@ export default function LiveMapScreen() {
           <Ionicons name="locate" size={22} color={colors.text} />
         </TouchableOpacity>
 
-        {selectedEvent ? (
+        {selectedEvent && isRouteMode ? (
+          <RouteCard
+            event={selectedEvent}
+            route={route}
+            status={routeStatus}
+            message={routeMessage}
+            bottomOffset={routeCardBottom}
+            onClose={closeRouteMode}
+            onRetry={retryRoute}
+          />
+        ) : selectedEvent ? (
           <EventCard event={selectedEvent} bottomOffset={eventCardBottom} />
         ) : null}
       </View>
@@ -569,5 +832,83 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "800",
+  },
+  routeCard: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: "rgba(255,36,36,0.24)",
+    backgroundColor: "rgba(10,12,16,0.94)",
+    ...shadows.card,
+  },
+  routeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  routeTitleWrap: { flex: 1 },
+  routeTitle: {
+    marginTop: 3,
+    color: colors.text,
+    fontSize: typography.cardTitle,
+    fontWeight: "900",
+    letterSpacing: -0.4,
+  },
+  routeCloseButton: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  routeStatusRow: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  routeStatusText: {
+    marginTop: spacing.sm,
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: "800",
+  },
+  routeMetrics: {
+    marginTop: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  routeMetric: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "900",
+  },
+  routeMetricMuted: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: "900",
+  },
+  routeRetryButton: {
+    marginTop: spacing.md,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255,36,36,0.44)",
+    backgroundColor: "rgba(215,25,32,0.18)",
+  },
+  routeRetryText: {
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: "900",
   },
 });
