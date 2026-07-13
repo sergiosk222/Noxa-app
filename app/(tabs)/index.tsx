@@ -80,6 +80,7 @@ const DRIVER_LOCATION_MIN_WRITE_MS = 7000;
 const DRIVER_PRESENCE_HEARTBEAT_MS = 45 * 1000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+let driverLocationsMapChannelSequence = 0;
 
 const TAB_BAR_HEIGHT = 82;
 const TAB_BAR_BOTTOM_GAP = spacing.md;
@@ -234,6 +235,11 @@ function hasValidCoordinates(
     event.longitude >= -180 &&
     event.longitude <= 180,
   );
+}
+
+function createDriverLocationsMapTopic() {
+  driverLocationsMapChannelSequence += 1;
+  return `driver-locations-map:${Date.now()}:${driverLocationsMapChannelSequence}`;
 }
 
 function formatDistance(meters: number) {
@@ -694,29 +700,33 @@ export default function LiveMapScreen() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
     isMountedRef.current = true;
     void refreshActiveDrivers();
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (event === "SIGNED_OUT" || !session) void stopSharing(true);
+        if (isActive && (event === "SIGNED_OUT" || !session))
+          void stopSharing(true);
       },
     );
-    const channel = supabase
-      .channel("driver-locations-map")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "driver_locations" },
-        () => void refreshActiveDrivers(),
-      )
-      .subscribe((status) => {
-        if (status === "CHANNEL_ERROR" && isMountedRef.current) {
-          setSharingError(
-            (current) => current ?? "Live driver updates are reconnecting.",
-          );
-        }
-      });
+    const channel = supabase.channel(createDriverLocationsMapTopic());
+    channel.on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "driver_locations" },
+      () => {
+        if (isActive) void refreshActiveDrivers();
+      },
+    );
+    channel.subscribe((status) => {
+      if (status === "CHANNEL_ERROR" && isActive && isMountedRef.current) {
+        setSharingError(
+          (current) => current ?? "Live driver updates are reconnecting.",
+        );
+      }
+    });
 
     return () => {
+      isActive = false;
       isMountedRef.current = false;
       activeDriversRequestIdRef.current += 1;
       locationWatcherRef.current?.remove();
