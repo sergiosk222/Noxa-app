@@ -42,7 +42,7 @@ as $$
   );
 $$;
 
-create or replace function public.noxa_is_crew_member(target_crew_id uuid, target_user_id uuid)
+create or replace function public.noxa_is_crew_member(target_crew_id uuid)
 returns boolean
 language sql
 security definer
@@ -53,11 +53,11 @@ as $$
     select 1
     from public.crew_members
     where public.crew_members.crew_id = target_crew_id
-      and public.crew_members.user_id = target_user_id
+      and public.crew_members.user_id = (select auth.uid())
   );
 $$;
 
-create or replace function public.noxa_can_view_crew(target_crew_id uuid, target_user_id uuid)
+create or replace function public.noxa_can_view_crew(target_crew_id uuid)
 returns boolean
 language sql
 security definer
@@ -70,8 +70,8 @@ as $$
     where public.crews.id = target_crew_id
       and (
         public.crews.is_public = true
-        or public.crews.owner_id = target_user_id
-        or public.noxa_is_crew_member(target_crew_id, target_user_id)
+        or public.crews.owner_id = (select auth.uid())
+        or public.noxa_is_crew_member(target_crew_id)
       )
   );
 $$;
@@ -122,14 +122,14 @@ grant select, insert, update, delete on table public.crews to authenticated;
 grant select, insert, delete on table public.crew_members to authenticated;
 
 revoke all on function public.noxa_is_crew_public(uuid) from public;
-revoke all on function public.noxa_is_crew_member(uuid, uuid) from public;
-revoke all on function public.noxa_can_view_crew(uuid, uuid) from public;
+revoke all on function public.noxa_is_crew_member(uuid) from public;
+revoke all on function public.noxa_can_view_crew(uuid) from public;
 revoke all on function public.noxa_insert_crew_owner_membership() from public;
 revoke all on function public.noxa_protect_crew_owner_and_touch_updated_at() from public;
 
 grant execute on function public.noxa_is_crew_public(uuid) to authenticated;
-grant execute on function public.noxa_is_crew_member(uuid, uuid) to authenticated;
-grant execute on function public.noxa_can_view_crew(uuid, uuid) to authenticated;
+grant execute on function public.noxa_is_crew_member(uuid) to authenticated;
+grant execute on function public.noxa_can_view_crew(uuid) to authenticated;
 
 alter table public.crews enable row level security;
 alter table public.crew_members enable row level security;
@@ -146,7 +146,7 @@ create policy "NOXA crews are readable when visible"
   on public.crews
   for select
   to authenticated
-  using (public.noxa_can_view_crew(id, (select auth.uid())));
+  using (public.noxa_can_view_crew(id));
 
 create policy "NOXA users can create owned crews"
   on public.crews
@@ -171,7 +171,7 @@ create policy "NOXA memberships readable for visible crews"
   on public.crew_members
   for select
   to authenticated
-  using (public.noxa_can_view_crew(crew_id, (select auth.uid())));
+  using (public.noxa_can_view_crew(crew_id));
 
 create policy "NOXA users can join public crews"
   on public.crew_members
