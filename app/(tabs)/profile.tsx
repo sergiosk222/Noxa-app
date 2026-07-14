@@ -27,6 +27,12 @@ type CurrentUserProfile = {
   city: string | null;
 };
 
+type ProfilePost = {
+  id: string;
+  image_url: string;
+  created_at: string;
+};
+
 function useEntryAnimation(delay = 0, distance: number = animations.entranceDistance) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(distance)).current;
@@ -199,6 +205,61 @@ function ProfileStats({
   );
 }
 
+function ProfilePosts({ posts, isLoading }: { posts: ProfilePost[]; isLoading: boolean }) {
+  return (
+    <Animated.View style={[styles.postsSection, useEntryAnimation(140)]}>
+      <View style={styles.postsHeader}>
+        <View>
+          <Text style={styles.sectionTitle}>POSTS</Text>
+          <Text style={styles.postsCaption}>
+            {posts.length === 1 ? '1 shared moment' : `${posts.length} shared moments`}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityLabel="Create post"
+          accessibilityRole="button"
+          onPress={() => router.push('/post-editor')}
+          style={({ pressed }) => [styles.newPostButton, pressed && styles.pressed]}>
+          <Ionicons name="add" size={16} color={colors.text} />
+          <Text style={styles.newPostText}>NEW POST</Text>
+        </Pressable>
+      </View>
+      {isLoading ? (
+        <View style={styles.postsEmpty}>
+          <Text style={styles.postsEmptyText}>Loading posts…</Text>
+        </View>
+      ) : posts.length ? (
+        <View style={styles.postGrid}>
+          {posts.map((post) => (
+            <Pressable
+              key={post.id}
+              accessibilityLabel="Open post"
+              accessibilityRole="button"
+              onPress={() => router.push({ pathname: '/post-details', params: { id: post.id } })}
+              style={({ pressed }) => [styles.postTile, pressed && styles.pressed]}>
+              <Image source={{ uri: post.image_url }} style={styles.postImage} />
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/post-editor')}
+          style={({ pressed }) => [styles.postsEmpty, pressed && styles.pressed]}>
+          <View style={styles.postsEmptyIcon}>
+            <Ionicons name="camera-outline" size={23} color={colors.primaryHover} />
+          </View>
+          <View style={styles.postsEmptyCopy}>
+            <Text style={styles.postsEmptyTitle}>Share your first moment</Text>
+            <Text style={styles.postsEmptyText}>Add a photo to your NOXA profile.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color={colors.textSubtle} />
+        </Pressable>
+      )}
+    </Animated.View>
+  );
+}
+
 function ExploreCard({ vehiclesCount }: { vehiclesCount: number }) {
   const links = [
     {
@@ -279,6 +340,7 @@ export default function ProfileScreen() {
   const [followingCount, setFollowingCount] = useState(0);
   const [vehiclesCount, setVehiclesCount] = useState(0);
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [posts, setPosts] = useState<ProfilePost[]>([]);
 
   const loadProfile = useCallback(async () => {
     setIsProfileLoading(true);
@@ -294,11 +356,12 @@ export default function ProfileScreen() {
       setFollowingCount(0);
       setVehiclesCount(0);
       setCoverImageUrl(null);
+      setPosts([]);
       setIsProfileLoading(false);
       return;
     }
 
-    const [profileResult, followersResult, followingResult, vehiclesResult] = await Promise.all([
+    const [profileResult, followersResult, followingResult, vehiclesResult, postsResult] = await Promise.all([
       supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url, bio, city')
@@ -319,6 +382,12 @@ export default function ProfileScreen() {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from('posts')
+        .select('id,image_url,created_at')
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(12),
     ]);
 
     if (profileResult.error || followersResult.error || followingResult.error || vehiclesResult.error) {
@@ -332,6 +401,8 @@ export default function ProfileScreen() {
     setFollowingCount(followingResult.count ?? 0);
     setVehiclesCount(vehiclesResult.count ?? 0);
     setCoverImageUrl(vehiclesResult.data?.cover_image_url ?? null);
+    setPosts(postsResult.error ? [] : (postsResult.data ?? []) as ProfilePost[]);
+    if (postsResult.error) setProfileError('Profile loaded, but posts are unavailable.');
     setIsProfileLoading(false);
   }, []);
 
@@ -379,6 +450,7 @@ export default function ProfileScreen() {
             followingCount={followingCount}
             vehiclesCount={vehiclesCount}
           />
+          <ProfilePosts posts={posts} isLoading={isProfileLoading} />
           <ExploreCard vehiclesCount={vehiclesCount} />
           <AccountCard isSigningOut={isSigningOut} onSignOut={confirmSignOut} />
         </View>
@@ -500,6 +572,54 @@ const styles = StyleSheet.create({
     lineHeight: 25,
   },
   statLabel: { marginTop: spacing.xxs, color: colors.textSubtle, fontSize: 8, fontWeight: '900', letterSpacing: 0.8 },
+  postsSection: { gap: spacing.sm },
+  postsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  postsCaption: { marginTop: 2, color: colors.textSubtle, fontSize: 9, fontWeight: '800' },
+  newPostButton: {
+    minHeight: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  newPostText: { color: colors.text, fontSize: 9, fontWeight: '900', letterSpacing: 0.7 },
+  postGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  postTile: {
+    width: '31.6%',
+    aspectRatio: 1,
+    overflow: 'hidden',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  postImage: { width: '100%', height: '100%' },
+  postsEmpty: {
+    minHeight: 84,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  postsEmptyIcon: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySubtle,
+  },
+  postsEmptyCopy: { flex: 1 },
+  postsEmptyTitle: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  postsEmptyText: { marginTop: 2, color: colors.textMuted, fontSize: 10, fontWeight: '700' },
   sectionBlock: { gap: spacing.sm },
   sectionTitle: {
     color: colors.textMuted,

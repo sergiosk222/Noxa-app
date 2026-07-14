@@ -37,6 +37,7 @@ type EventForm = {
   startAt: Date;
   endAt: Date | null;
   isPublic: boolean;
+  crewId: string | null;
   latitude: number | null;
   longitude: number | null;
 };
@@ -49,11 +50,13 @@ type EventRow = {
   starts_at: string;
   ends_at: string | null;
   is_public: boolean;
+  crew_id: string | null;
   latitude: number | null;
   longitude: number | null;
 };
 type PickerTarget = "startDate" | "startTime" | "endDate" | "endTime";
 type DraftLocation = { latitude: number; longitude: number };
+type ManagedCrew = { id: string; name: string; logo_url: string | null };
 
 const THESSALONIKI = { latitude: 40.6401, longitude: 22.9444 };
 const MAP_DELTA = { latitudeDelta: 0.035, longitudeDelta: 0.035 };
@@ -74,6 +77,7 @@ const initialForm: EventForm = {
   startAt: futureStart(),
   endAt: null,
   isPublic: true,
+  crewId: null,
   latitude: null,
   longitude: null,
 };
@@ -147,17 +151,21 @@ function prefillFromEvent(event: EventRow): EventForm {
     startAt: isValidDate(start) ? start : futureStart(),
     endAt: isValidDate(end) ? end : null,
     isPublic: event.is_public,
+    crewId: event.crew_id,
     latitude: event.latitude,
     longitude: event.longitude,
   };
 }
 
 export default function EventEditorScreen() {
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; crewId?: string }>();
   const eventId = typeof params.id === "string" ? params.id : undefined;
+  const requestedCrewId = typeof params.crewId === "string" ? params.crewId : undefined;
   const isEditing = Boolean(eventId);
   const [form, setForm] = useState<EventForm>(initialForm);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [managedCrews, setManagedCrews] = useState<ManagedCrew[]>([]);
+  const [crewLoadError, setCrewLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(eventId));
   const [saving, setSaving] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
@@ -202,6 +210,35 @@ export default function EventEditorScreen() {
       return;
     }
     setCurrentUserId(authData.user.id);
+    setCrewLoadError(null);
+    const { data: membershipRows, error: membershipsError } = await supabase
+      .from("crew_members")
+      .select("crew_id,role")
+      .eq("user_id", authData.user.id)
+      .in("role", ["owner", "admin"]);
+    if (membershipsError) {
+      setManagedCrews([]);
+      setCrewLoadError("Crew hosts could not be loaded.");
+    } else {
+      const crewIds = Array.from(new Set((membershipRows ?? []).map((row) => row.crew_id)));
+      const { data: crewRows, error: crewsError } = crewIds.length
+        ? await supabase
+            .from("crews")
+            .select("id,name,logo_url")
+            .in("id", crewIds)
+            .order("name", { ascending: true })
+        : { data: [], error: null };
+      if (crewsError) {
+        setManagedCrews([]);
+        setCrewLoadError("Crew hosts could not be loaded.");
+      } else {
+        const nextCrews = (crewRows ?? []) as ManagedCrew[];
+        setManagedCrews(nextCrews);
+        if (!eventId && requestedCrewId && nextCrews.some((crew) => crew.id === requestedCrewId)) {
+          setForm((current) => ({ ...current, crewId: requestedCrewId }));
+        }
+      }
+    }
     if (!eventId) {
       setLoading(false);
       return;
@@ -214,7 +251,7 @@ export default function EventEditorScreen() {
     const { data, error: eventError } = await supabase
       .from("events")
       .select(
-        "id,creator_id,title,description,location_name,starts_at,ends_at,is_public,latitude,longitude",
+        "id,creator_id,title,description,location_name,starts_at,ends_at,is_public,crew_id,latitude,longitude",
       )
       .eq("id", eventId)
       .maybeSingle();
@@ -224,7 +261,7 @@ export default function EventEditorScreen() {
       setError("Only the event host can edit this event.");
     else setForm(prefillFromEvent(data as EventRow));
     setLoading(false);
-  }, [eventId]);
+  }, [eventId, requestedCrewId]);
 
   useEffect(() => {
     void loadEvent();
@@ -430,6 +467,7 @@ export default function EventEditorScreen() {
       starts_at: valid.start.toISOString(),
       ends_at: valid.end?.toISOString() ?? null,
       is_public: form.isPublic,
+      crew_id: form.crewId,
       latitude: form.latitude,
       longitude: form.longitude,
     };
@@ -695,7 +733,35 @@ export default function EventEditorScreen() {
 
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeading}>
-              <Text style={styles.eyebrow}>04 / VISIBILITY</Text>
+              <Text style={styles.eyebrow}>04 / HOST</Text>
+              <Text style={styles.sectionTitle}>Choose the organizer</Text>
+            </View>
+            <View style={styles.hostOptions}>
+              <HostOption
+                active={!form.crewId}
+                icon="person-outline"
+                label="My profile"
+                onPress={() => updateField("crewId", null)}
+              />
+              {managedCrews.map((crew) => (
+                <HostOption
+                  active={form.crewId === crew.id}
+                  icon="people-outline"
+                  key={crew.id}
+                  label={crew.name}
+                  onPress={() => updateField("crewId", crew.id)}
+                />
+              ))}
+            </View>
+            {crewLoadError ? <Text style={styles.hostError}>{crewLoadError}</Text> : null}
+            {!crewLoadError && managedCrews.length === 0 ? (
+              <Text style={styles.hostHelper}>Create or manage a crew to host events under its name.</Text>
+            ) : null}
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.eyebrow}>05 / VISIBILITY</Text>
               <Text style={styles.sectionTitle}>Choose the audience</Text>
             </View>
             <View style={styles.visibilityOptions}>
@@ -708,7 +774,7 @@ export default function EventEditorScreen() {
               />
               <VisibilityOption
                 active={!form.isPublic}
-                description="Visible only to you for now"
+                description={form.crewId ? "Visible to crew members" : "Visible only to you for now"}
                 icon="lock-closed-outline"
                 label="Private"
                 onPress={() => updateField("isPublic", false)}
@@ -828,6 +894,42 @@ function PickerRow({
     >
       <Text style={styles.pickerLabel}>{label}</Text>
       <Text style={styles.pickerValue}>{value}</Text>
+    </Pressable>
+  );
+}
+
+function HostOption({
+  active,
+  icon,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.hostOption,
+        active && styles.hostOptionActive,
+        pressed && styles.pressed,
+      ]}>
+      <View style={[styles.hostOptionIcon, active && styles.hostOptionIconActive]}>
+        <Ionicons name={icon} size={18} color={active ? colors.primaryHover : colors.textMuted} />
+      </View>
+      <Text numberOfLines={1} style={[styles.hostOptionText, active && styles.hostOptionTextActive]}>
+        {label}
+      </Text>
+      <Ionicons
+        name={active ? "checkmark-circle" : "ellipse-outline"}
+        size={18}
+        color={active ? colors.primaryHover : colors.textSubtle}
+      />
     </Pressable>
   );
 }
@@ -1148,6 +1250,32 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     fontWeight: "800",
   },
+  hostOptions: { gap: spacing.xs },
+  hostOption: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  hostOptionActive: { borderColor: colors.borderAccent, backgroundColor: colors.primarySubtle },
+  hostOptionIcon: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  hostOptionIconActive: { backgroundColor: colors.primaryMuted },
+  hostOptionText: { flex: 1, color: colors.textMuted, fontSize: 13, fontWeight: "800" },
+  hostOptionTextActive: { color: colors.text },
+  hostHelper: { color: colors.textMuted, fontSize: 11, fontWeight: "700", lineHeight: 17 },
+  hostError: { color: colors.primaryHover, fontSize: 11, fontWeight: "700" },
   visibilityOptions: {
     flexDirection: "row",
     gap: spacing.sm,

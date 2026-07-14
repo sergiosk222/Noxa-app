@@ -30,6 +30,8 @@ export default function RootLayout() {
         <Stack.Screen name="search" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="event-details" />
+        <Stack.Screen name="post-editor" />
+        <Stack.Screen name="post-details" />
       </Stack>
       <StatusBar style="light" />
     </ThemeProvider>

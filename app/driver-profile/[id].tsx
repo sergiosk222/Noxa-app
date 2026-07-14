@@ -38,6 +38,12 @@ type PublicVehicle = {
   is_public: boolean | null;
 };
 
+type PublicPost = {
+  id: string;
+  image_url: string;
+  created_at: string;
+};
+
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -110,6 +116,7 @@ export default function PublicDriverProfileScreen() {
   const isValidDriverId = uuidPattern.test(driverId);
   const [profile, setProfile] = useState<DriverProfile | null>(null);
   const [vehicles, setVehicles] = useState<PublicVehicle[]>([]);
+  const [posts, setPosts] = useState<PublicPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -122,6 +129,7 @@ export default function PublicDriverProfileScreen() {
     if (!isValidDriverId) {
       setProfile(null);
       setVehicles([]);
+      setPosts([]);
       setErrorMessage("This driver profile link is invalid.");
       setIsLoading(false);
       return;
@@ -143,6 +151,7 @@ export default function PublicDriverProfileScreen() {
     if (profileError) {
       setProfile(null);
       setVehicles([]);
+      setPosts([]);
       setErrorMessage("Unable to load this driver profile.");
       setIsLoading(false);
       return;
@@ -151,6 +160,7 @@ export default function PublicDriverProfileScreen() {
     if (!profileData) {
       setProfile(null);
       setVehicles([]);
+      setPosts([]);
       setIsLoading(false);
       return;
     }
@@ -187,27 +197,37 @@ export default function PublicDriverProfileScreen() {
       setErrorMessage("Driver loaded, but social details could not be loaded.");
     }
 
-    const { data: vehicleData, error: vehicleError } = await supabase
-      .from("vehicles")
-      .select(
-        "id, brand, model, year, horsepower, color, cover_image_url, is_public",
-      )
-      .eq("owner_id", driverId)
-      .eq("is_public", true)
-      .order("created_at", { ascending: false });
+    const [vehicleResult, postResult] = await Promise.all([
+      supabase
+        .from("vehicles")
+        .select(
+          "id, brand, model, year, horsepower, color, cover_image_url, is_public",
+        )
+        .eq("owner_id", driverId)
+        .eq("is_public", true)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("posts")
+        .select("id,image_url,created_at")
+        .eq("author_id", driverId)
+        .order("created_at", { ascending: false })
+        .limit(12),
+    ]);
 
-    if (vehicleError) {
+    if (vehicleResult.error || postResult.error) {
       setProfile(profileData);
       setVehicles([]);
+      setPosts([]);
       setErrorMessage(
-        "Driver loaded, but public vehicles could not be loaded.",
+        "Driver loaded, but public content could not be loaded.",
       );
       setIsLoading(false);
       return;
     }
 
     setProfile(profileData);
-    setVehicles(vehicleData ?? []);
+    setVehicles(vehicleResult.data ?? []);
+    setPosts((postResult.data ?? []) as PublicPost[]);
     setIsLoading(false);
   }, [driverId, isValidDriverId]);
 
@@ -480,6 +500,26 @@ export default function PublicDriverProfileScreen() {
                 message={errorMessage}
                 onRetry={loadDriverProfile}
               />
+            ) : null}
+
+            {posts.length ? (
+              <>
+                <SectionTitle title="Posts" />
+                <View style={styles.postGrid}>
+                  {posts.map((post) => (
+                    <Pressable
+                      accessibilityLabel="Open post"
+                      accessibilityRole="button"
+                      key={post.id}
+                      onPress={() =>
+                        router.push({ pathname: "/post-details", params: { id: post.id } })
+                      }
+                      style={({ pressed }) => [styles.postTile, pressed && styles.pressed]}>
+                      <Image source={{ uri: post.image_url }} style={styles.postImage} />
+                    </Pressable>
+                  ))}
+                </View>
+              </>
             ) : null}
 
             {coverVehicle ? (
@@ -851,6 +891,17 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: -0.3,
   },
+  postGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
+  postTile: {
+    width: "31.6%",
+    aspectRatio: 1,
+    overflow: "hidden",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  postImage: { width: "100%", height: "100%" },
   featuredVehicle: {
     height: 172,
     overflow: "hidden",

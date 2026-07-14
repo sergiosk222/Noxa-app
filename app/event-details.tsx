@@ -21,6 +21,7 @@ import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 type EventRow = {
   id: string;
   creator_id: string;
+  crew_id: string | null;
   title: string;
   description: string | null;
   location_name: string;
@@ -37,6 +38,12 @@ type CreatorProfile = {
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
+  city: string | null;
+};
+type EventCrew = {
+  id: string;
+  name: string;
+  logo_url: string | null;
   city: string | null;
 };
 
@@ -120,12 +127,15 @@ export default function EventDetailsScreen() {
   const eventId = typeof params.id === "string" ? params.id : "";
   const [event, setEvent] = useState<EventRow | null>(null);
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
+  const [eventCrew, setEventCrew] = useState<EventCrew | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [attendeeCount, setAttendeeCount] = useState(0);
   const [attendees, setAttendees] = useState<CreatorProfile[]>([]);
   const [isAttending, setIsAttending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -184,6 +194,8 @@ export default function EventDetailsScreen() {
     setError(null);
     setNotFound(false);
     if (!uuidPattern.test(eventId)) {
+      setEventCrew(null);
+      setIsSaved(false);
       setNotFound(true);
       setLoading(false);
       return;
@@ -208,17 +220,38 @@ export default function EventDetailsScreen() {
     }
     const loadedEvent = eventData as EventRow;
     setEvent(loadedEvent);
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("id,display_name,username,avatar_url,city")
-      .eq("id", loadedEvent.creator_id)
-      .maybeSingle();
-    if (profileError) {
-      setError(profileError.message);
+    const [profileResult, crewResult, savedResult] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id,display_name,username,avatar_url,city")
+        .eq("id", loadedEvent.creator_id)
+        .maybeSingle(),
+      loadedEvent.crew_id
+        ? supabase
+            .from("crews")
+            .select("id,name,logo_url,city")
+            .eq("id", loadedEvent.crew_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      userId
+        ? supabase
+            .from("saved_events")
+            .select("event_id")
+            .eq("event_id", loadedEvent.id)
+            .eq("user_id", userId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    const detailError = profileResult.error || crewResult.error;
+    if (detailError) {
+      setError(detailError.message);
       setLoading(false);
       return;
     }
-    setCreator((profileData as CreatorProfile | null) ?? null);
+    setCreator((profileResult.data as CreatorProfile | null) ?? null);
+    setEventCrew((crewResult.data as EventCrew | null) ?? null);
+    setIsSaved(savedResult.error ? false : Boolean(savedResult.data));
+    if (savedResult.error) setError("Event loaded, but its saved status is unavailable.");
     try {
       await loadAttendance(loadedEvent.id, userId);
     } catch (attendanceError) {
@@ -274,6 +307,24 @@ export default function EventDetailsScreen() {
     loadAttendance,
     routeOnNoxaMap,
   ]);
+
+  const toggleSavedEvent = useCallback(async () => {
+    if (!event || !currentUserId || savingEvent) return;
+    setSavingEvent(true);
+    setError(null);
+    const result = isSaved
+      ? await supabase
+          .from("saved_events")
+          .delete()
+          .eq("event_id", event.id)
+          .eq("user_id", currentUserId)
+      : await supabase
+          .from("saved_events")
+          .insert({ event_id: event.id, user_id: currentUserId });
+    if (result.error) setError(result.error.message);
+    else setIsSaved(!isSaved);
+    setSavingEvent(false);
+  }, [currentUserId, event, isSaved, savingEvent]);
 
   const confirmDelete = useCallback(() => {
     if (!event || !currentUserId || deleting) return;
@@ -342,6 +393,11 @@ export default function EventDetailsScreen() {
         />
         <View style={styles.headerActions}>
           <HeaderAction
+            icon={isSaved ? "heart" : "heart-outline"}
+            label={isSaved ? "Remove saved event" : "Save event"}
+            onPress={() => void toggleSavedEvent()}
+          />
+          <HeaderAction
             icon="refresh"
             label="Refresh event"
             onPress={() => void loadEvent()}
@@ -388,7 +444,7 @@ export default function EventDetailsScreen() {
                   <NoxaBadge label={event.is_public ? "PUBLIC" : "PRIVATE"} variant="default" />
                 </View>
                 <Text style={styles.heroTitle}>{event.title}</Text>
-                <Text style={styles.heroHost}>Hosted by {displayName(creator)}</Text>
+                <Text style={styles.heroHost}>Hosted by {eventCrew?.name ?? displayName(creator)}</Text>
               </View>
             </View>
 
@@ -407,35 +463,37 @@ export default function EventDetailsScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={() =>
-                router.push({
-                  pathname: "/driver-profile/[id]",
-                  params: { id: event.creator_id },
-                })
+                eventCrew
+                  ? router.push({ pathname: "/crew/[id]", params: { id: eventCrew.id } })
+                  : router.push({
+                      pathname: "/driver-profile/[id]",
+                      params: { id: event.creator_id },
+                    })
               }
               style={({ pressed }) => [
                 styles.cardCompact,
                 pressed && styles.pressed,
               ]}
             >
-              {creator?.avatar_url ? (
+              {(eventCrew?.logo_url || creator?.avatar_url) ? (
                 <Image
-                  source={{ uri: creator.avatar_url }}
+                  source={{ uri: eventCrew?.logo_url ?? creator?.avatar_url ?? "" }}
                   style={styles.hostAvatar}
                 />
               ) : (
                 <View style={styles.hostAvatarFallback}>
-                  <Ionicons name="person" size={24} color={colors.text} />
+                  <Ionicons name={eventCrew ? "people" : "person"} size={24} color={colors.text} />
                 </View>
               )}
               <View style={styles.hostCopy}>
-                <Text style={styles.eyebrow}>Host</Text>
-                <Text style={styles.hostName}>{displayName(creator)}</Text>
+                <Text style={styles.eyebrow}>{eventCrew ? "Host crew" : "Host"}</Text>
+                <Text style={styles.hostName}>{eventCrew?.name ?? displayName(creator)}</Text>
                 <Text style={styles.mutedText}>
-                  {creator?.city ?? "NOXA community"}
+                  {eventCrew?.city ?? creator?.city ?? "NOXA community"}
                 </Text>
               </View>
               <Ionicons
-                name="shield-checkmark"
+                name={eventCrew ? "people" : "shield-checkmark"}
                 size={22}
                 color={colors.primary}
               />

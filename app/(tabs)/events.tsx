@@ -160,6 +160,9 @@ function EventCard({ event, index }: { event: EventWithCount; index: number }) {
 export default function EventsScreen() {
   const router = useRouter();
   const [events, setEvents] = useState<EventWithCount[]>([]);
+  const [savedEventIds, setSavedEventIds] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'upcoming' | 'saved'>('upcoming');
+  const [savedLoadError, setSavedLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,23 +170,31 @@ export default function EventsScreen() {
   const loadEvents = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     setError(null);
+    setSavedLoadError(null);
 
-    const { data, error: eventsError } = await supabase
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData.user?.id ?? null;
+    const eventsQuery = supabase
       .from('events')
       .select('id,title,location_name,starts_at,is_public,cover_image_url')
       .eq('status', 'scheduled')
       .gte('starts_at', new Date().toISOString())
       .order('starts_at', { ascending: true });
+    const savedQuery = userId
+      ? supabase.from('saved_events').select('event_id').eq('user_id', userId)
+      : Promise.resolve({ data: [], error: null });
+    const [eventsResult, savedResult] = await Promise.all([eventsQuery, savedQuery]);
 
-    if (eventsError) {
-      setError(eventsError.message);
+    if (eventsResult.error) {
+      setError(eventsResult.error.message);
       setEvents([]);
+      setSavedEventIds([]);
       setLoading(false);
       setRefreshing(false);
       return;
     }
 
-    const rows = (data ?? []) as EventRow[];
+    const rows = (eventsResult.data ?? []) as EventRow[];
     const ids = rows.map((event) => event.id);
     const counts = new Map<string, number>();
 
@@ -204,6 +215,8 @@ export default function EventsScreen() {
     }
 
     setEvents(rows.map((event) => ({ ...event, attendeeCount: counts.get(event.id) ?? 0 })));
+    setSavedEventIds(savedResult.error ? [] : (savedResult.data ?? []).map((row) => row.event_id));
+    if (savedResult.error) setSavedLoadError('Saved events could not be loaded.');
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -219,8 +232,11 @@ export default function EventsScreen() {
     void loadEvents(false);
   }, [loadEvents]);
 
-  const nextEvent = events[0] ?? null;
-  const laterEvents = events.slice(1);
+  const savedIdSet = new Set(savedEventIds);
+  const visibleEvents = viewMode === 'saved' ? events.filter((event) => savedIdSet.has(event.id)) : events;
+  const visibleSavedCount = events.filter((event) => savedIdSet.has(event.id)).length;
+  const nextEvent = visibleEvents[0] ?? null;
+  const laterEvents = visibleEvents.slice(1);
 
   return (
     <NoxaScreen padded={false}>
@@ -243,6 +259,25 @@ export default function EventsScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.filterBar}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setViewMode('upcoming')}
+            style={({ pressed }) => [styles.filterButton, viewMode === 'upcoming' && styles.filterButtonActive, pressed && styles.pressed]}>
+            <Ionicons name="calendar-outline" size={16} color={viewMode === 'upcoming' ? colors.primaryHover : colors.textMuted} />
+            <Text style={[styles.filterText, viewMode === 'upcoming' && styles.filterTextActive]}>UPCOMING</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setViewMode('saved')}
+            style={({ pressed }) => [styles.filterButton, viewMode === 'saved' && styles.filterButtonActive, pressed && styles.pressed]}>
+            <Ionicons name={viewMode === 'saved' ? 'heart' : 'heart-outline'} size={16} color={viewMode === 'saved' ? colors.primaryHover : colors.textMuted} />
+            <Text style={[styles.filterText, viewMode === 'saved' && styles.filterTextActive]}>SAVED</Text>
+            {visibleSavedCount ? <Text style={styles.filterCount}>{visibleSavedCount}</Text> : null}
+          </Pressable>
+        </View>
+        {savedLoadError ? <Text style={styles.savedLoadError}>{savedLoadError}</Text> : null}
+
         {loading ? (
           <View style={styles.stateCard}>
             <ActivityIndicator color={colors.primary} />
@@ -258,8 +293,8 @@ export default function EventsScreen() {
         ) : nextEvent ? (
           <>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionEyebrow}>NEXT EVENT</Text>
-              <Text style={styles.sectionMeta}>{events.length} UPCOMING</Text>
+              <Text style={styles.sectionEyebrow}>{viewMode === 'saved' ? 'NEXT SAVED' : 'NEXT EVENT'}</Text>
+              <Text style={styles.sectionMeta}>{visibleEvents.length} {viewMode === 'saved' ? 'SAVED' : 'UPCOMING'}</Text>
             </View>
             <FeaturedEvent event={nextEvent} />
 
@@ -277,10 +312,20 @@ export default function EventsScreen() {
           </>
         ) : (
           <View style={styles.stateCard}>
-            <View style={styles.stateIcon}><Ionicons name="flag-outline" size={30} color={colors.primary} /></View>
-            <Text style={styles.stateTitle}>No upcoming events</Text>
-            <Text style={styles.stateText}>Create the first scheduled NOXA event.</Text>
-            <NoxaButton title="Create Event" size="md" onPress={() => router.push('/event-editor')} />
+            <View style={styles.stateIcon}>
+              <Ionicons name={viewMode === 'saved' ? 'heart-outline' : 'flag-outline'} size={30} color={colors.primary} />
+            </View>
+            <Text style={styles.stateTitle}>{viewMode === 'saved' ? 'No saved events' : 'No upcoming events'}</Text>
+            <Text style={styles.stateText}>
+              {viewMode === 'saved'
+                ? 'Save an event from its detail page to find it here.'
+                : 'Create the first scheduled NOXA event.'}
+            </Text>
+            <NoxaButton
+              title={viewMode === 'saved' ? 'Browse Events' : 'Create Event'}
+              size="md"
+              onPress={() => viewMode === 'saved' ? setViewMode('upcoming') : router.push('/event-editor')}
+            />
           </View>
         )}
       </ScrollView>
@@ -336,6 +381,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   pressed: { opacity: 0.82, transform: [{ translateY: 1 }, { scale: 0.985 }] },
+  filterBar: {
+    minHeight: 46,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    padding: spacing.xxs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  filterButton: {
+    flex: 1,
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderRadius: radius.sm,
+  },
+  filterButtonActive: { backgroundColor: colors.primarySubtle },
+  filterText: { color: colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
+  filterTextActive: { color: colors.text },
+  filterCount: {
+    minWidth: 20,
+    paddingHorizontal: spacing.xxs,
+    paddingVertical: 2,
+    overflow: 'hidden',
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    color: colors.text,
+    fontSize: 9,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  savedLoadError: { color: colors.primaryHover, fontSize: 10, fontWeight: '700', textAlign: 'center' },
   sectionHeader: {
     marginTop: spacing.xs,
     flexDirection: 'row',

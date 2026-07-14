@@ -72,6 +72,14 @@ type Vehicle = {
   cover_image_url: string | null;
   is_public: boolean | null;
 };
+type CrewEvent = {
+  id: string;
+  title: string;
+  location_name: string;
+  starts_at: string;
+  is_public: boolean;
+  status: string;
+};
 type Member = Membership & { profile: Profile | null };
 type PendingInvitation = {
   id: string;
@@ -457,6 +465,97 @@ function SectionHeading({
           <Text style={styles.countPillText}>{count}</Text>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function CrewEvents({
+  canCreate,
+  error,
+  events,
+  onCreate,
+  onOpen,
+}: {
+  canCreate: boolean;
+  error: string | null;
+  events: CrewEvent[];
+  onCreate: () => void;
+  onOpen: (eventId: string) => void;
+}) {
+  return (
+    <View style={styles.sectionBlock}>
+      <View style={styles.eventsHeadingRow}>
+        <View style={styles.eventsHeadingContent}>
+          <SectionHeading
+            caption="Upcoming drives and meets"
+            count={events.length}
+            title="CREW EVENTS"
+          />
+        </View>
+        {canCreate ? (
+          <Pressable
+            accessibilityLabel="Create crew event"
+            accessibilityRole="button"
+            onPress={onCreate}
+            style={({ pressed }) => [styles.createEventButton, pressed && styles.pressed]}>
+            <Ionicons name="add" size={16} color={colors.text} />
+          </Pressable>
+        ) : null}
+      </View>
+      {error ? (
+        <View style={styles.emptyPanel}>
+          <Ionicons name="cloud-offline-outline" size={24} color={colors.primaryHover} />
+          <Text style={styles.emptyText}>{error}</Text>
+        </View>
+      ) : events.length ? (
+        <View style={styles.eventsCard}>
+          {events.map((event, index) => {
+            const date = new Date(event.starts_at);
+            return (
+              <Pressable
+                accessibilityLabel={`Open ${event.title}`}
+                accessibilityRole="button"
+                key={event.id}
+                onPress={() => onOpen(event.id)}
+                style={({ pressed }) => [
+                  styles.eventRow,
+                  index < events.length - 1 && styles.eventRowBorder,
+                  pressed && styles.pressed,
+                ]}>
+                <View style={styles.eventDateTile}>
+                  <Text style={styles.eventDateDay}>
+                    {new Intl.DateTimeFormat(undefined, { day: "2-digit" }).format(date)}
+                  </Text>
+                  <Text style={styles.eventDateMonth}>
+                    {new Intl.DateTimeFormat(undefined, { month: "short" }).format(date).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.eventCopy}>
+                  <View style={styles.eventTitleRow}>
+                    <Text numberOfLines={1} style={styles.eventTitle}>{event.title}</Text>
+                    {!event.is_public ? <Ionicons name="lock-closed" size={12} color={colors.textMuted} /> : null}
+                  </View>
+                  <Text numberOfLines={1} style={styles.eventMeta}>
+                    {new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date)} · {event.location_name}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={17} color={colors.textSubtle} />
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : (
+        <Pressable
+          accessibilityRole={canCreate ? "button" : undefined}
+          disabled={!canCreate}
+          onPress={canCreate ? onCreate : undefined}
+          style={({ pressed }) => [styles.emptyPanel, pressed && canCreate && styles.pressed]}>
+          <Ionicons name="calendar-outline" size={24} color={colors.textSubtle} />
+          <Text style={styles.emptyText}>
+            {canCreate ? "Plan the first event for this crew." : "No upcoming crew events."}
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -923,6 +1022,8 @@ export default function CrewDetailsScreen() {
   const [owner, setOwner] = useState<Profile | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [crewEvents, setCrewEvents] = useState<CrewEvent[]>([]);
+  const [crewEventsError, setCrewEventsError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -954,6 +1055,8 @@ export default function CrewDetailsScreen() {
         setPendingJoinRequest(null);
         setJoinRequests([]);
         setVehicles([]);
+        setCrewEvents([]);
+        setCrewEventsError(null);
         setError("This crew link is invalid.");
         setLoading(false);
         return;
@@ -984,6 +1087,8 @@ export default function CrewDetailsScreen() {
         setPendingJoinRequest(null);
         setJoinRequests([]);
         setVehicles([]);
+        setCrewEvents([]);
+        setCrewEventsError(null);
         setError("Crew not found or unavailable.");
         setLoading(false);
         loadingRef.current = false;
@@ -1080,6 +1185,8 @@ export default function CrewDetailsScreen() {
                   : (a.joined_at ?? "").localeCompare(b.joined_at ?? ""),
         );
       let vehicleRows: Vehicle[] = [];
+      let eventRows: CrewEvent[] = [];
+      let nextCrewEventsError: string | null = null;
       let nextPendingInvitations: PendingInvitation[] = [];
       let nextPendingJoinRequest: JoinRequest | null = null;
       let nextJoinRequests: JoinRequest[] = [];
@@ -1252,6 +1359,20 @@ export default function CrewDetailsScreen() {
         }
         vehicleRows = (loadedVehicles ?? []) as Vehicle[];
       }
+      const { data: loadedEvents, error: eventsError } = await supabase
+        .from("events")
+        .select("id,title,location_name,starts_at,is_public,status")
+        .eq("crew_id", loadedCrew.id)
+        .eq("status", "scheduled")
+        .gte("starts_at", new Date().toISOString())
+        .order("starts_at", { ascending: true })
+        .limit(10);
+      if (requestId.current !== token) {
+        loadingRef.current = false;
+        return;
+      }
+      if (eventsError) nextCrewEventsError = "Crew events are unavailable right now.";
+      else eventRows = (loadedEvents ?? []) as CrewEvent[];
       setCurrentUserId(userId);
       setCrew(loadedCrew);
       setOwner(
@@ -1264,6 +1385,8 @@ export default function CrewDetailsScreen() {
       setPendingJoinRequest(nextPendingJoinRequest);
       setJoinRequests(nextJoinRequests);
       setVehicles(vehicleRows);
+      setCrewEvents(eventRows);
+      setCrewEventsError(nextCrewEventsError);
       setLoading(false);
       loadingRef.current = false;
     },
@@ -1620,6 +1743,17 @@ export default function CrewDetailsScreen() {
               }
               owner={owner}
               vehiclesCount={vehicles.length}
+            />
+            <CrewEvents
+              canCreate={canManageCrew}
+              error={crewEventsError}
+              events={crewEvents}
+              onCreate={() =>
+                router.push({ pathname: "/event-editor", params: { crewId: crew.id } })
+              }
+              onOpen={(eventId) =>
+                router.push({ pathname: "/event-details", params: { id: eventId } })
+              }
             />
             {canManageCrew ? (
               <>
@@ -2043,6 +2177,56 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 22,
   },
+  eventsHeadingRow: { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm },
+  eventsHeadingContent: { flex: 1 },
+  createEventButton: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  eventsCard: {
+    overflow: "hidden",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  eventRow: {
+    minHeight: 78,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  eventRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  eventDateTile: {
+    width: 48,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primarySubtle,
+  },
+  eventDateDay: {
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: 21,
+    fontWeight: "900",
+    lineHeight: 23,
+  },
+  eventDateMonth: { color: colors.primaryHover, fontSize: 8, fontWeight: "900", letterSpacing: 0.8 },
+  eventCopy: { flex: 1, minWidth: 0 },
+  eventTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  eventTitle: { flex: 1, color: colors.text, fontSize: 13, fontWeight: "900" },
+  eventMeta: { marginTop: spacing.xxs, color: colors.textMuted, fontSize: 10, fontWeight: "700" },
   managementEmpty: {
     minHeight: 58,
     flexDirection: "row",
