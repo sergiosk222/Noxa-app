@@ -12,12 +12,12 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
   type ImageStyle,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { NoxaBadge, NoxaScreen } from "@/src/components/ui";
 import { supabase } from "@/src/lib/supabase";
@@ -305,115 +305,140 @@ function CreateCrewModal({
     }
   }, [visible]);
 
+  const canSubmit = name.trim().length >= 2 && !creating;
+
   return (
     <Modal
       animationType="slide"
-      transparent
+      presentationStyle="fullScreen"
       visible={visible}
       onRequestClose={creating ? undefined : onClose}
     >
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Create crew</Text>
-          <TextInput
-            placeholder="Crew name"
-            placeholderTextColor={colors.textMuted}
-            value={name}
-            onChangeText={setName}
-            maxLength={60}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Description"
-            placeholderTextColor={colors.textMuted}
-            value={description}
-            onChangeText={setDescription}
-            maxLength={500}
-            multiline
-            style={[styles.input, styles.textArea]}
-          />
-          <TextInput
-            placeholder="City"
-            placeholderTextColor={colors.textMuted}
-            value={city}
-            onChangeText={setCity}
-            maxLength={80}
-            style={styles.input}
-          />
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Public crew</Text>
-            <Switch
-              value={isPublic}
-              onValueChange={setIsPublic}
-              trackColor={{
-                false: colors.surfaceSoft,
-                true: colors.primaryMuted,
-              }}
-              thumbColor={isPublic ? colors.primary : colors.textMuted}
-            />
+      <SafeAreaView style={styles.modalScreen}>
+        <View style={styles.modalHeader}>
+          <Pressable
+            accessibilityLabel="Close create crew"
+            accessibilityRole="button"
+            disabled={creating}
+            onPress={onClose}
+            style={({ pressed }) => [styles.modalBackButton, pressed && styles.pressed]}>
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
+          </Pressable>
+          <Text style={styles.modalHeaderTitle}>CREATE CREW</Text>
+          <View style={styles.modalHeaderSpacer} />
+        </View>
+
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.modalContent}>
+          <View style={styles.crewPreview}>
+            <View style={styles.previewGlowLarge} />
+            <View style={styles.previewGlowSmall} />
+            <Ionicons name="people" size={58} color={colors.primaryMuted} />
+            <View style={styles.logoPreview}>
+              <Text style={styles.logoPreviewText}>{name.trim() ? crewInitials(name) : "NX"}</Text>
+            </View>
           </View>
+
+          <View style={styles.formField}>
+            <Text style={styles.fieldLabel}>CREW NAME</Text>
+            <TextInput
+              placeholder="e.g. Apex Collective"
+              placeholderTextColor={colors.textSubtle}
+              selectionColor={colors.primary}
+              value={name}
+              onChangeText={setName}
+              maxLength={60}
+              style={styles.input}
+            />
+            <Text style={styles.fieldHint}>2–60 characters</Text>
+          </View>
+
+          <View style={styles.formField}>
+            <Text style={styles.fieldLabel}>PRIVACY</Text>
+            <View style={styles.privacyOptions}>
+              {[
+                { label: "Public", value: true },
+                { label: "Private", value: false },
+              ].map((option) => {
+                const selected = isPublic === option.value;
+                return (
+                  <Pressable
+                    key={option.label}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => setIsPublic(option.value)}
+                    style={({ pressed }) => [styles.privacyOption, selected && styles.privacyOptionActive, pressed && styles.pressed]}>
+                    <Ionicons name={option.value ? "earth-outline" : "lock-closed-outline"} size={15} color={selected ? colors.text : colors.textMuted} />
+                    <Text style={[styles.privacyOptionText, selected && styles.privacyOptionTextActive]}>{option.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
           {isPublic ? (
-            <View style={styles.policyOptions}>
-              {(["open", "approval", "invite_only"] as JoinPolicy[]).map(
-                (policy) => (
+            <View style={styles.formField}>
+              <Text style={styles.fieldLabel}>JOIN POLICY</Text>
+              <View style={styles.policyOptions}>
+                {(["open", "approval", "invite_only"] as JoinPolicy[]).map((policy) => (
                   <Pressable
                     key={policy}
                     accessibilityRole="button"
+                    accessibilityState={{ selected: joinPolicy === policy }}
                     onPress={() => setJoinPolicy(policy)}
-                    style={({ pressed }) => [
-                      styles.policyOption,
-                      joinPolicy === policy && styles.policyOptionActive,
-                      pressed && styles.pressed,
-                    ]}
-                  >
+                    style={({ pressed }) => [styles.policyOption, joinPolicy === policy && styles.policyOptionActive, pressed && styles.pressed]}>
                     <Text style={styles.policyOptionText}>
-                      {policy === "open"
-                        ? "Open"
-                        : policy === "approval"
-                          ? "Approval"
-                          : "Invite Only"}
+                      {policy === "open" ? "Open" : policy === "approval" ? "Approval" : "Invite Only"}
                     </Text>
                   </Pressable>
-                ),
-              )}
+                ))}
+              </View>
             </View>
           ) : null}
-          <View style={styles.modalActions}>
-            <Pressable
-              disabled={creating}
-              onPress={onClose}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              disabled={creating}
-              onPress={() =>
-                onSubmit({
-                  name,
-                  description,
-                  city,
-                  isPublic,
-                  joinPolicy: isPublic ? joinPolicy : "invite_only",
-                })
-              }
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              {creating ? (
-                <ActivityIndicator color={colors.text} />
-              ) : (
-                <Text style={styles.primaryButtonText}>Create</Text>
-              )}
-            </Pressable>
+
+          <View style={styles.formField}>
+            <Text style={styles.fieldLabel}>LOCATION</Text>
+            <TextInput
+              placeholder="City or region"
+              placeholderTextColor={colors.textSubtle}
+              selectionColor={colors.primary}
+              value={city}
+              onChangeText={setCity}
+              maxLength={80}
+              style={styles.input}
+            />
           </View>
+
+          <View style={styles.formField}>
+            <View style={styles.fieldLabelRow}>
+              <Text style={styles.fieldLabel}>DESCRIPTION</Text>
+              <Text style={styles.fieldCount}>{description.length}/500</Text>
+            </View>
+            <TextInput
+              placeholder="What is your crew about?"
+              placeholderTextColor={colors.textSubtle}
+              selectionColor={colors.primary}
+              value={description}
+              onChangeText={setDescription}
+              maxLength={500}
+              multiline
+              style={[styles.input, styles.textArea]}
+            />
+          </View>
+        </ScrollView>
+
+        <View style={styles.modalFooter}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!canSubmit}
+            onPress={() => onSubmit({ name, description, city, isPublic, joinPolicy: isPublic ? joinPolicy : "invite_only" })}
+            style={({ pressed }) => [styles.createCrewSubmit, !canSubmit && styles.createCrewSubmitDisabled, pressed && canSubmit && styles.pressed]}>
+            {creating ? <ActivityIndicator color={colors.text} /> : <Text style={styles.createCrewSubmitText}>CREATE CREW</Text>}
+          </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -1407,50 +1432,87 @@ const styles = StyleSheet.create({
     borderRadius: radius.button,
     backgroundColor: colors.primary,
   },
-  bottomAction: {
-    position: "absolute",
-    left: spacing.lg,
-    right: spacing.lg,
-    bottom: 106,
-    alignItems: "center",
-  },
-  createButton: {
-    minHeight: 56,
+  modalScreen: { flex: 1, backgroundColor: colors.background },
+  modalHeader: {
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  modalBackButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.xxl,
     borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-    ...shadows.redGlow,
   },
-  createText: {
+  modalHeaderTitle: {
     color: colors.text,
-    fontSize: typography.body,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.title,
     fontWeight: "900",
-    letterSpacing: 0.2,
+    letterSpacing: 0.6,
   },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    padding: spacing.lg,
-    backgroundColor: "rgba(0,0,0,0.72)",
-  },
-  modalCard: {
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.card,
-    backgroundColor: colors.surface,
+  modalHeaderSpacer: { width: 40, height: 40 },
+  modalContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: 128, gap: spacing.lg },
+  crewPreview: {
+    height: 146,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
+    marginBottom: spacing.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
+    borderStyle: "dashed",
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceSoft,
   },
-  modalTitle: {
-    color: colors.text,
-    fontSize: typography.sectionTitle,
+  previewGlowLarge: {
+    position: "absolute",
+    right: -30,
+    top: -46,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    backgroundColor: colors.primaryMuted,
+  },
+  previewGlowSmall: {
+    position: "absolute",
+    left: 30,
+    bottom: -36,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 18,
+    borderColor: colors.primarySubtle,
+  },
+  logoPreview: {
+    position: "absolute",
+    left: spacing.md,
+    bottom: -26,
+    width: 60,
+    height: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    borderWidth: 3,
+    borderColor: colors.background,
+    backgroundColor: colors.surfaceRaised,
+  },
+  logoPreviewText: {
+    color: colors.primaryHover,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.title,
     fontWeight: "900",
   },
+  formField: { gap: spacing.xs },
+  fieldLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  fieldLabel: { color: colors.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: typography.letterSpacing.label },
+  fieldCount: { color: colors.textSubtle, fontSize: 10, fontWeight: "700" },
+  fieldHint: { color: colors.textSubtle, fontSize: 10, fontWeight: "600" },
   input: {
     minHeight: 48,
     paddingHorizontal: spacing.md,
@@ -1460,47 +1522,51 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceSoft,
     color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "600",
   },
-  textArea: { minHeight: 92, textAlignVertical: "top" },
-  switchRow: {
+  textArea: { minHeight: 112, textAlignVertical: "top" },
+  privacyOptions: { flexDirection: "row", gap: spacing.sm },
+  privacyOption: {
+    flex: 1,
+    minHeight: 42,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
+    gap: spacing.xs,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
   },
-  switchLabel: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+  privacyOptionActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  privacyOptionText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: "800" },
+  privacyOptionTextActive: { color: colors.text },
+  modalFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.glass,
   },
-  modalActions: { flexDirection: "row", gap: spacing.sm },
-  primaryButton: {
-    flex: 1,
-    minHeight: 48,
+  createCrewSubmit: {
+    minHeight: 54,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.button,
     backgroundColor: colors.primary,
+    ...shadows.redGlow,
   },
+  createCrewSubmitDisabled: { opacity: 0.42 },
+  createCrewSubmitText: { color: colors.text, fontSize: 14, fontWeight: "900", letterSpacing: 0.8 },
   primaryButtonText: {
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "900",
-  },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.button,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryButtonText: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
   },
 });
