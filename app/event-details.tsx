@@ -40,8 +40,6 @@ type CreatorProfile = {
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const placeholderImage =
-  "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1400&q=88";
 
 function HeaderAction({
   icon,
@@ -63,7 +61,7 @@ function HeaderAction({
     </Pressable>
   );
 }
-function formatDate(value: string) {
+function formatDateTime(value: string) {
   return new Intl.DateTimeFormat(undefined, {
     weekday: "short",
     month: "short",
@@ -72,8 +70,47 @@ function formatDate(value: string) {
     minute: "2-digit",
   }).format(new Date(value));
 }
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
+}
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 function displayName(profile: CreatorProfile | null) {
   return profile?.display_name || profile?.username || "NOXA driver";
+}
+function profileHandle(profile: CreatorProfile) {
+  if (!profile.username) return profile.city ?? "NOXA member";
+  return profile.username.startsWith("@") ? profile.username : `@${profile.username}`;
+}
+
+function EventInfoCell({
+  icon,
+  label,
+  value,
+  leftBorder = false,
+  bottomBorder = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+  leftBorder?: boolean;
+  bottomBorder?: boolean;
+}) {
+  return (
+    <View style={[styles.infoCell, leftBorder && styles.infoCellLeftBorder, bottomBorder && styles.infoCellBottomBorder]}>
+      <View style={styles.infoIcon}><Ionicons name={icon} size={18} color={colors.primaryHover} /></View>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text numberOfLines={2} style={styles.infoValue}>{value}</Text>
+    </View>
+  );
 }
 
 export default function EventDetailsScreen() {
@@ -83,6 +120,7 @@ export default function EventDetailsScreen() {
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [attendeeCount, setAttendeeCount] = useState(0);
+  const [attendees, setAttendees] = useState<CreatorProfile[]>([]);
   const [isAttending, setIsAttending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -103,6 +141,27 @@ export default function EventDetailsScreen() {
         .eq("event_id", id);
       if (countError) throw countError;
       setAttendeeCount(count ?? 0);
+      const { data: attendeeRows, error: attendeesError } = await supabase
+        .from("event_attendees")
+        .select("user_id")
+        .eq("event_id", id)
+        .order("joined_at", { ascending: true })
+        .limit(4);
+      if (attendeesError) throw attendeesError;
+      const attendeeIds = (attendeeRows ?? []).map((row) => row.user_id);
+      if (attendeeIds.length > 0) {
+        const { data: attendeeProfiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id,display_name,username,avatar_url,city")
+          .in("id", attendeeIds);
+        if (profilesError) throw profilesError;
+        const profilesById = new Map(
+          ((attendeeProfiles ?? []) as CreatorProfile[]).map((profile) => [profile.id, profile]),
+        );
+        setAttendees(attendeeIds.map((attendeeId) => profilesById.get(attendeeId)).filter((profile): profile is CreatorProfile => Boolean(profile)));
+      } else {
+        setAttendees([]);
+      }
       if (userId) {
         const { data, error: mineError } = await supabase
           .from("event_attendees")
@@ -249,7 +308,7 @@ export default function EventDetailsScreen() {
     );
   }, [currentUserId, deleting, event]);
 
-  const bottomLabel = isHost ? "HOSTING" : isAttending ? "Going" : "Join Event";
+  const bottomLabel = isHost ? "HOSTING" : isAttending ? "Cancel Attendance" : "Attend Event";
 
   return (
     <NoxaScreen padded={false}>
@@ -285,39 +344,37 @@ export default function EventDetailsScreen() {
         ) : event ? (
           <>
             <View style={styles.heroCard}>
-              <Image
-                source={{ uri: event.cover_image_url ?? placeholderImage }}
-                style={styles.heroImage}
-              />
+              {event.cover_image_url ? (
+                <Image source={{ uri: event.cover_image_url }} style={styles.heroImage} />
+              ) : (
+                <View style={[styles.heroImage, styles.heroPlaceholder]}>
+                  <Ionicons name="flag" size={88} color={colors.primaryMuted} />
+                </View>
+              )}
               <View style={styles.heroShade} />
               <View style={styles.heroBottomShade} />
               <View style={styles.heroContent}>
-                <NoxaBadge
-                  label={event.is_public ? "PUBLIC" : "PRIVATE"}
-                  variant={event.is_public ? "primary" : "default"}
-                />
+                <View style={styles.heroBadgeRow}>
+                  <NoxaBadge label={event.status.toUpperCase()} variant={event.status === "scheduled" ? "primary" : "default"} />
+                  <NoxaBadge label={event.is_public ? "PUBLIC" : "PRIVATE"} variant="default" />
+                </View>
                 <Text style={styles.heroTitle}>{event.title}</Text>
-                <View style={styles.heroMetaRow}>
-                  <Ionicons
-                    name="location-outline"
-                    size={17}
-                    color={colors.text}
-                  />
-                  <Text style={styles.heroMeta}>{event.location_name}</Text>
-                </View>
-                <View style={styles.heroMetaRow}>
-                  <Ionicons name="time-outline" size={17} color={colors.text} />
-                  <Text style={styles.heroMeta}>
-                    {formatDate(event.starts_at)}
-                  </Text>
-                </View>
-                {event.ends_at ? (
-                  <Text style={styles.heroMeta}>
-                    Ends {formatDate(event.ends_at)}
-                  </Text>
-                ) : null}
+                <Text style={styles.heroHost}>Hosted by {displayName(creator)}</Text>
               </View>
             </View>
+
+            <View style={styles.infoGrid}>
+              <EventInfoCell icon="location-outline" label="LOCATION" value={event.location_name} bottomBorder />
+              <EventInfoCell icon="calendar-outline" label="DATE" value={formatDate(event.starts_at)} leftBorder bottomBorder />
+              <EventInfoCell icon="time-outline" label="TIME" value={formatTime(event.starts_at)} />
+              <EventInfoCell
+                icon={event.is_public ? "earth-outline" : "lock-closed-outline"}
+                label="ACCESS"
+                value={event.is_public ? "Public event" : "Private event"}
+                leftBorder
+              />
+            </View>
+
             <Pressable
               accessibilityRole="button"
               onPress={() =>
@@ -354,10 +411,14 @@ export default function EventDetailsScreen() {
                 color={colors.primary}
               />
             </Pressable>
+
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Attendance</Text>
-                <Text style={styles.sectionMeta}>{attendeeCount} going</Text>
+                <Text style={styles.sectionTitle}>ATTENDING</Text>
+                <View style={styles.attendancePill}>
+                  <Ionicons name="people" size={14} color={colors.primaryHover} />
+                  <Text style={styles.attendancePillText}>{attendeeCount} GOING</Text>
+                </View>
               </View>
               <Text style={styles.description}>
                 {isHost
@@ -367,9 +428,48 @@ export default function EventDetailsScreen() {
                     : "Join when you plan to attend."}
               </Text>
             </View>
+
+            {event.description ? (
+              <View style={styles.aboutSection}>
+                <Text style={styles.sectionEyebrow}>ABOUT</Text>
+                <Text style={styles.aboutText}>{event.description}</Text>
+              </View>
+            ) : null}
+
+            {attendees.length > 0 ? (
+              <View style={styles.attendeesSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionEyebrow}>WHO&apos;S GOING</Text>
+                  {attendeeCount > attendees.length ? <Text style={styles.sectionMeta}>+{attendeeCount - attendees.length} MORE</Text> : null}
+                </View>
+                <View style={styles.attendeeList}>
+                  {attendees.map((attendee, index) => (
+                    <Pressable
+                      key={attendee.id}
+                      accessibilityRole="button"
+                      onPress={() => router.push({ pathname: "/driver-profile/[id]", params: { id: attendee.id } })}
+                      style={({ pressed }) => [styles.attendeeRow, index < attendees.length - 1 && styles.attendeeRowBorder, pressed && styles.pressed]}>
+                      {attendee.avatar_url ? (
+                        <Image source={{ uri: attendee.avatar_url }} style={styles.attendeeAvatar} />
+                      ) : (
+                        <View style={[styles.attendeeAvatar, styles.attendeeAvatarFallback]}>
+                          <Ionicons name="person" size={18} color={colors.text} />
+                        </View>
+                      )}
+                      <View style={styles.attendeeCopy}>
+                        <Text style={styles.attendeeName}>{displayName(attendee)}</Text>
+                        <Text style={styles.attendeeHandle}>{profileHandle(attendee)}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textSubtle} />
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
             {isAttending && !isHost ? (
               <View style={styles.sectionCard}>
-                <Text style={styles.sectionTitle}>NOXA Route</Text>
+                <Text style={styles.sectionTitle}>NOXA ROUTE</Text>
                 <Text style={styles.description}>
                   Open a private in-app route from your current position to this
                   event.
@@ -381,15 +481,17 @@ export default function EventDetailsScreen() {
                 />
               </View>
             ) : null}
-            {event.description ? (
-              <View style={styles.sectionCard}>
-                <Text style={styles.sectionTitle}>Description</Text>
-                <Text style={styles.description}>{event.description}</Text>
+
+            {event.ends_at ? (
+              <View style={styles.endNote}>
+                <Ionicons name="time-outline" size={16} color={colors.textMuted} />
+                <Text style={styles.endNoteText}>Ends {formatDateTime(event.ends_at)}</Text>
               </View>
             ) : null}
+
             {isHost ? (
               <View style={styles.sectionCard}>
-                <Text style={styles.sectionTitle}>Organizer controls</Text>
+                <Text style={styles.sectionTitle}>ORGANIZER CONTROLS</Text>
                 <NoxaButton
                   title="Edit Event"
                   variant="secondary"
@@ -454,26 +556,24 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   headerAction: {
-    width: 46,
-    height: 46,
+    width: 38,
+    height: 38,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(8,10,14,0.72)",
+    backgroundColor: "rgba(6,6,10,0.76)",
   },
   pressed: { opacity: 0.86, transform: [{ translateY: 1 }, { scale: 0.98 }] },
-  content: { paddingBottom: 132, gap: spacing.lg },
+  content: { paddingBottom: 132, gap: spacing.md },
   heroCard: {
-    height: 390,
+    height: 300,
     overflow: "hidden",
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
     backgroundColor: colors.surface,
-    ...shadows.card,
   },
   heroImage: { width: "100%", height: "100%" },
+  heroPlaceholder: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSoft },
   heroShade: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.28)",
@@ -483,8 +583,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 210,
-    backgroundColor: "rgba(0,0,0,0.64)",
+    height: 190,
+    backgroundColor: "rgba(6,6,10,0.68)",
   },
   heroContent: {
     position: "absolute",
@@ -495,16 +595,39 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: colors.text,
-    fontSize: 43,
+    fontFamily: typography.fontFamily.display,
+    fontSize: 34,
     fontWeight: "900",
-    letterSpacing: -1.3,
+    letterSpacing: 0.4,
+    lineHeight: 37,
+    textTransform: "uppercase",
   },
-  heroMetaRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  heroMeta: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+  heroBadgeRow: { flexDirection: "row", gap: spacing.xs },
+  heroHost: { color: "rgba(240,240,244,0.58)", fontSize: typography.caption, fontWeight: "700" },
+  infoGrid: {
+    marginHorizontal: spacing.lg,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    overflow: "hidden",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
+  infoCell: { width: "50%", minHeight: 112, padding: spacing.md, justifyContent: "center" },
+  infoCellLeftBorder: { borderLeftWidth: 1, borderLeftColor: colors.divider },
+  infoCellBottomBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  infoIcon: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.xs,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primarySubtle,
+  },
+  infoLabel: { color: colors.textSubtle, fontSize: 9, fontWeight: "900", letterSpacing: 1.1 },
+  infoValue: { marginTop: spacing.xxs, color: colors.text, fontSize: typography.caption, fontWeight: "800", lineHeight: 17 },
   cardCompact: {
     marginHorizontal: spacing.lg,
     flexDirection: "row",
@@ -562,7 +685,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    ...shadows.card,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -572,9 +694,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.text,
-    fontSize: typography.sectionTitle,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.title,
     fontWeight: "900",
-    letterSpacing: -0.3,
+    letterSpacing: 0.4,
   },
   sectionMeta: {
     color: colors.textMuted,
@@ -587,6 +710,38 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 24,
   },
+  attendancePill: {
+    minHeight: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySubtle,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+  },
+  attendancePillText: { color: colors.primaryHover, fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
+  aboutSection: { marginHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: spacing.xs },
+  sectionEyebrow: { color: colors.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: typography.letterSpacing.label },
+  aboutText: { color: colors.text, fontSize: 14, fontWeight: "600", lineHeight: 23 },
+  attendeesSection: { marginHorizontal: spacing.lg, gap: spacing.sm },
+  attendeeList: {
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  attendeeRow: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  attendeeRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  attendeeAvatar: { width: 40, height: 40, borderRadius: radius.pill },
+  attendeeAvatarFallback: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSoft },
+  attendeeCopy: { flex: 1 },
+  attendeeName: { color: colors.text, fontSize: 14, fontWeight: "800" },
+  attendeeHandle: { marginTop: 2, color: colors.textMuted, fontSize: typography.caption, fontWeight: "600" },
+  endNote: { marginHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  endNoteText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: "700" },
   fullState: {
     minHeight: 420,
     alignItems: "center",
@@ -628,13 +783,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: "rgba(5,6,8,0.94)",
+    backgroundColor: "rgba(6,6,10,0.96)",
   },
   joinButton: {
-    height: 58,
+    height: 54,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radius.pill,
+    borderRadius: radius.button,
     backgroundColor: colors.primary,
     ...shadows.redGlow,
   },
