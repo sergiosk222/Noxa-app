@@ -15,7 +15,7 @@ const crewDots = [
   ['#8E919A', '#FF2D2D', '#FFFFFF'],
 ] as const;
 
-type CrewRole = 'owner' | 'member';
+type CrewRole = 'owner' | 'admin' | 'member';
 
 type CrewRow = {
   id: string;
@@ -35,6 +35,10 @@ type CrewMemberRow = {
   user_id: string;
   role: CrewRole;
 };
+
+type Invitation = { id: string; crew_id: string; invited_user_id: string; invited_by: string; status: string; created_at: string; crewName: string; crewCity: string | null; inviterName: string };
+
+type ProfileLite = { id: string; display_name: string | null; username: string | null };
 
 type Crew = CrewRow & {
   ownerName: string;
@@ -239,6 +243,8 @@ export default function CrewsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [creating, setCreating] = useState(false);
   const [busyCrewId, setBusyCrewId] = useState<string | null>(null);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [busyInvitationId, setBusyInvitationId] = useState<string | null>(null);
   const requestId = useRef(0);
   const mounted = useRef(true);
 
@@ -257,11 +263,60 @@ export default function CrewsScreen() {
       if (mounted.current && requestId.current === currentRequest) {
         setUserId(null);
         setCrews([]);
+        setInvitations([]);
         setError('Sign in to view and manage crews.');
         setLoading(false);
         setRefreshing(false);
       }
       return;
+    }
+
+    const { data: inviteRows, error: invitationsError } = await supabase
+      .from('crew_invitations')
+      .select('id,crew_id,invited_user_id,invited_by,status,created_at')
+      .eq('invited_user_id', currentUserId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (invitationsError) {
+      if (mounted.current && requestId.current === currentRequest) {
+        setUserId(currentUserId);
+        setInvitations([]);
+        setCrews([]);
+        setError('Crew invitations are unavailable right now.');
+        setLoading(false);
+        setRefreshing(false);
+      }
+      return;
+    }
+
+    const pendingInviteRows = (inviteRows ?? []) as Omit<Invitation, 'crewName' | 'crewCity' | 'inviterName'>[];
+    let nextInvitations: Invitation[] = [];
+    if (pendingInviteRows.length > 0) {
+      const invitedCrewIds = Array.from(new Set(pendingInviteRows.map((invite) => invite.crew_id)));
+      const inviterIds = Array.from(new Set(pendingInviteRows.map((invite) => invite.invited_by)));
+      const [inviteCrewsResult, invitersResult] = await Promise.all([
+        supabase.from('crews').select('id,name,city').in('id', invitedCrewIds),
+        supabase.from('profiles').select('id,display_name,username').in('id', inviterIds),
+      ]);
+      if (inviteCrewsResult.error || invitersResult.error) {
+        if (mounted.current && requestId.current === currentRequest) {
+          setUserId(currentUserId);
+          setInvitations([]);
+          setCrews([]);
+          setError('Crew invitations are unavailable right now.');
+          setLoading(false);
+          setRefreshing(false);
+        }
+        return;
+      }
+      const inviteCrewMap = new Map(((inviteCrewsResult.data ?? []) as { id: string; name: string; city: string | null }[]).map((crew) => [crew.id, crew]));
+      const inviterMap = new Map(((invitersResult.data ?? []) as ProfileLite[]).map((profile) => [profile.id, profile]));
+      nextInvitations = pendingInviteRows.map((invite) => {
+        const invitedCrew = inviteCrewMap.get(invite.crew_id);
+        const inviter = inviterMap.get(invite.invited_by);
+        return { ...invite, crewName: invitedCrew?.name ?? 'Crew', crewCity: invitedCrew?.city ?? null, inviterName: inviter?.display_name ?? inviter?.username ?? 'Driver' };
+      });
     }
 
     const { data, error: crewsError } = await supabase
@@ -318,6 +373,7 @@ export default function CrewsScreen() {
 
     if (mounted.current && requestId.current === currentRequest) {
       setUserId(currentUserId);
+      setInvitations(nextInvitations);
       setCrews(nextCrews);
       setLoading(false);
       setRefreshing(false);
@@ -395,6 +451,19 @@ export default function CrewsScreen() {
     ]);
   }, [busyCrewId, loadCrews, userId]);
 
+  const respondToInvitation = useCallback(async (invitationId: string, accept: boolean) => {
+    if (busyInvitationId) return;
+    setBusyInvitationId(invitationId);
+    const { data: ok, error: responseError } = await supabase.rpc('noxa_respond_to_crew_invitation', { target_invitation_id: invitationId, accept });
+    setBusyInvitationId(null);
+    if (responseError || ok !== true) {
+      Alert.alert('Invitation not updated', 'Please try again.');
+      return;
+    }
+    setInvitations((current) => current.filter((invite) => invite.id !== invitationId));
+    if (accept) void loadCrews(false);
+  }, [busyInvitationId, loadCrews]);
+
   const featuredCrew = crews[0] ?? null;
 
   return (
@@ -403,6 +472,30 @@ export default function CrewsScreen() {
         <NoxaHeader title="CREWS" subtitle="Find your people" right={<CreateIconButton onPress={openCreate} />} />
         <FeaturedCrewCard crew={featuredCrew} loading={loading} />
         <CategoryTabs />
+        {invitations.length > 0 ? (
+          <View style={styles.invitationCard}>
+            <View style={styles.listHeader}>
+              <Text style={styles.sectionTitle}>Crew Invitations</Text>
+              <Text style={styles.sectionMeta}>{invitations.length} pending</Text>
+            </View>
+            {invitations.map((invite) => (
+              <View key={invite.id} style={styles.invitationRow}>
+                <View style={styles.crewTitleBlock}>
+                  <Text style={styles.crewName}>{invite.crewName}</Text>
+                  <Text style={styles.metaText}>{[invite.crewCity, `Invited by ${invite.inviterName}`].filter(Boolean).join(' • ')}</Text>
+                </View>
+                <View style={styles.invitationActions}>
+                  <Pressable disabled={busyInvitationId === invite.id} onPress={() => void respondToInvitation(invite.id, true)} style={({ pressed }) => [styles.smallPrimaryButton, pressed && styles.pressed]}>
+                    {busyInvitationId === invite.id ? <ActivityIndicator size="small" color={colors.text} /> : <Text style={styles.smallButtonText}>Accept</Text>}
+                  </Pressable>
+                  <Pressable disabled={busyInvitationId === invite.id} onPress={() => void respondToInvitation(invite.id, false)} style={({ pressed }) => [styles.smallSecondaryButton, pressed && styles.pressed]}>
+                    <Text style={styles.smallButtonText}>Decline</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
         <View style={styles.listHeader}>
           <Text style={styles.sectionTitle}>Community core</Text>
           <Text style={styles.sectionMeta}>{crews.length} crews</Text>
@@ -455,6 +548,12 @@ const styles = StyleSheet.create({
   listHeader: { marginTop: spacing.xs, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   sectionTitle: { color: colors.text, fontSize: typography.sectionTitle, fontWeight: '900', letterSpacing: -0.3 },
   sectionMeta: { color: colors.textMuted, fontSize: typography.caption, fontWeight: '700' },
+  invitationCard: { padding: spacing.lg, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: spacing.md, ...shadows.card },
+  invitationRow: { gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  invitationActions: { flexDirection: 'row', gap: spacing.sm },
+  smallPrimaryButton: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.primary },
+  smallSecondaryButton: { flex: 1, minHeight: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.surfaceSoft, borderWidth: 1, borderColor: colors.border },
+  smallButtonText: { color: colors.text, fontSize: typography.caption, fontWeight: '900' },
   crewCard: { overflow: 'hidden', padding: spacing.lg, borderRadius: radius.card, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, gap: spacing.md, ...shadows.card },
   redAccent: { position: 'absolute', left: 0, top: spacing.lg, bottom: spacing.lg, width: 3, borderTopRightRadius: radius.pill, borderBottomRightRadius: radius.pill, backgroundColor: colors.primary },
   crewMainPress: { borderRadius: radius.button },
