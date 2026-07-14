@@ -100,7 +100,10 @@ export default function SignInScreen() {
               Don&apos;t have an account? <Text style={styles.switchLink}>Sign Up</Text>
             </Text>
           </Pressable>
-          <Pressable accessibilityRole="button" style={styles.forgotButton}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/forgot-password')}
+            style={styles.forgotButton}>
             <Text style={styles.forgotText}>Forgot password?</Text>
           </Pressable>
         </View>

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -7,6 +8,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -124,6 +126,7 @@ export default function EventDetailsScreen() {
   const [isAttending, setIsAttending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -308,6 +311,25 @@ export default function EventDetailsScreen() {
     );
   }, [currentUserId, deleting, event]);
 
+  const shareEvent = useCallback(async () => {
+    if (!event || sharing) return;
+
+    setSharing(true);
+    try {
+      const eventUrl = Linking.createURL("/event-details", {
+        queryParams: { id: event.id },
+      });
+      await Share.share({
+        message: `${event.title}\n${formatDateTime(event.starts_at)} · ${event.location_name}\n${eventUrl}`,
+        title: event.title,
+      });
+    } catch {
+      Alert.alert("Unable to share event", "Please try again.");
+    } finally {
+      setSharing(false);
+    }
+  }, [event, sharing]);
+
   const bottomLabel = isHost ? "HOSTING" : isAttending ? "Cancel Attendance" : "Attend Event";
 
   return (
@@ -318,11 +340,18 @@ export default function EventDetailsScreen() {
           label="Go back"
           onPress={() => router.back()}
         />
-        <HeaderAction
-          icon="refresh"
-          label="Retry"
-          onPress={() => void loadEvent()}
-        />
+        <View style={styles.headerActions}>
+          <HeaderAction
+            icon="refresh"
+            label="Refresh event"
+            onPress={() => void loadEvent()}
+          />
+          <HeaderAction
+            icon={sharing ? "checkmark" : "share-social-outline"}
+            label="Share event"
+            onPress={() => void shareEvent()}
+          />
+        </View>
       </View>
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -565,6 +594,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
     backgroundColor: "rgba(6,6,10,0.76)",
   },
+  headerActions: { flexDirection: "row", gap: spacing.xs },
   pressed: { opacity: 0.86, transform: [{ translateY: 1 }, { scale: 0.98 }] },
   content: { paddingBottom: 132, gap: spacing.md },
   heroCard: {

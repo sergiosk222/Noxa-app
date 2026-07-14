@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
   useCallback,
@@ -14,6 +15,7 @@ import {
   ImageBackground,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -131,10 +133,14 @@ function vehicleName(vehicle: Vehicle) {
 
 function Header({
   onRefresh,
+  onShare,
   refreshing,
+  sharing,
 }: {
   onRefresh: () => void;
+  onShare: () => void;
   refreshing: boolean;
+  sharing: boolean;
 }) {
   return (
     <View style={styles.header}>
@@ -153,19 +159,36 @@ function Header({
         <Text style={styles.headerTitle}>CREW PROFILE</Text>
         <Text style={styles.headerSubtitle}>Community details</Text>
       </View>
-      <Pressable
-        accessibilityLabel="Refresh crew"
-        accessibilityRole="button"
-        disabled={refreshing}
-        onPress={onRefresh}
-        style={({ pressed }) => [
-          styles.headerButton,
-          pressed && styles.pressed,
-          refreshing && styles.disabled,
-        ]}
-      >
-        <Ionicons name="refresh" size={18} color={colors.textMuted} />
-      </Pressable>
+      <View style={styles.headerActions}>
+        <Pressable
+          accessibilityLabel="Share crew"
+          accessibilityRole="button"
+          disabled={sharing}
+          onPress={onShare}
+          style={({ pressed }) => [
+            styles.headerButton,
+            pressed && styles.pressed,
+            sharing && styles.disabled,
+          ]}>
+          <Ionicons
+            name={sharing ? "checkmark" : "share-social-outline"}
+            size={19}
+            color={colors.textMuted}
+          />
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Refresh crew"
+          accessibilityRole="button"
+          disabled={refreshing}
+          onPress={onRefresh}
+          style={({ pressed }) => [
+            styles.headerButton,
+            pressed && styles.pressed,
+            refreshing && styles.disabled,
+          ]}>
+          <Ionicons name="refresh" size={18} color={colors.textMuted} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -905,6 +928,7 @@ export default function CrewDetailsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [pendingInvitations, setPendingInvitations] = useState<
     PendingInvitation[]
   >([]);
@@ -1529,13 +1553,36 @@ export default function CrewDetailsScreen() {
     [crew, loadCrew, memberActionId],
   );
 
+  const shareCrew = useCallback(async () => {
+    if (!crew || sharing) return;
+
+    setSharing(true);
+    try {
+      const crewUrl = Linking.createURL(`/crew/${crew.id}`);
+      const location = crew.city ? ` · ${crew.city}` : "";
+      await Share.share({
+        message: `${crew.name}${location}\n${crew.description ?? "Join this crew on NOXA."}\n${crewUrl}`,
+        title: crew.name,
+      });
+    } catch {
+      Alert.alert("Unable to share crew", "Please try again.");
+    } finally {
+      setSharing(false);
+    }
+  }, [crew, sharing]);
+
   return (
     <NoxaScreen padded={false}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <Header onRefresh={() => void loadCrew()} refreshing={loading} />
+        <Header
+          onRefresh={() => void loadCrew()}
+          onShare={() => void shareCrew()}
+          refreshing={loading}
+          sharing={sharing}
+        />
         {loading ? <StateCard loading title="Loading crew..." /> : null}
         {!loading && error ? (
           <StateCard
@@ -1671,6 +1718,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   headerCopy: { flex: 1 },
+  headerActions: { flexDirection: "row", gap: spacing.xs },
   headerTitle: {
     color: colors.text,
     fontFamily: typography.fontFamily.display,

@@ -23,6 +23,8 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="welcome" />
+        <Stack.Screen name="forgot-password" />
+        <Stack.Screen name="reset-password" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="search" />
