@@ -637,6 +637,261 @@ function CrewGarage({
   );
 }
 
+function JoinRequestsPanel({
+  actionId,
+  onOpenProfile,
+  onReview,
+  requests,
+}: {
+  actionId: string | null;
+  onOpenProfile: (profileId: string) => void;
+  onReview: (requestId: string, approve: boolean) => void;
+  requests: JoinRequest[];
+}) {
+  return (
+    <View style={styles.sectionBlock}>
+      <SectionHeading
+        caption="Approve or reject people who want to join"
+        count={requests.length}
+        title="JOIN REQUESTS"
+      />
+      {requests.length === 0 ? (
+        <View style={styles.managementEmpty}>
+          <Ionicons name="checkmark-circle-outline" size={20} color={colors.success} />
+          <Text style={styles.managementEmptyText}>No pending requests.</Text>
+        </View>
+      ) : (
+        <View style={styles.managementCard}>
+          {requests.map((request, index) => {
+            const isBusy = actionId === request.id;
+            return (
+              <View
+                key={request.id}
+                style={[
+                  styles.managementRow,
+                  index < requests.length - 1 && styles.managementRowBorder,
+                ]}>
+                <Pressable
+                  accessibilityLabel={`Open ${displayName(request.profile)} profile`}
+                  accessibilityRole="button"
+                  onPress={() => onOpenProfile(request.user_id)}
+                  style={({ pressed }) => [styles.managementProfile, pressed && styles.pressed]}>
+                  <ProfileAvatar profile={request.profile} size={44} />
+                  <View style={styles.personCopy}>
+                    <Text style={styles.personName}>{displayName(request.profile)}</Text>
+                    <Text style={styles.personMeta}>
+                      {request.profile?.username
+                        ? `@${request.profile.username}`
+                        : (request.profile?.city ?? "NOXA driver")}
+                    </Text>
+                  </View>
+                </Pressable>
+                <View style={styles.requestActionBar}>
+                  <Pressable
+                    accessibilityLabel="Approve join request"
+                    accessibilityRole="button"
+                    disabled={isBusy}
+                    onPress={() => onReview(request.id, true)}
+                    style={({ pressed }) => [
+                      styles.iconDecisionButton,
+                      styles.approveButton,
+                      pressed && styles.pressed,
+                      isBusy && styles.disabled,
+                    ]}>
+                    <Ionicons name="checkmark" size={18} color={colors.text} />
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="Reject join request"
+                    accessibilityRole="button"
+                    disabled={isBusy}
+                    onPress={() => onReview(request.id, false)}
+                    style={({ pressed }) => [
+                      styles.iconDecisionButton,
+                      styles.rejectButton,
+                      pressed && styles.pressed,
+                      isBusy && styles.disabled,
+                    ]}>
+                    <Ionicons name="close" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function InviteManager({
+  actionId,
+  hasSearched,
+  onCancelInvitation,
+  onChangeQuery,
+  onInvite,
+  onOpenProfile,
+  onSearch,
+  pendingInvitations,
+  query,
+  results,
+  searching,
+}: {
+  actionId: string | null;
+  hasSearched: boolean;
+  onCancelInvitation: (invitationId: string) => void;
+  onChangeQuery: (value: string) => void;
+  onInvite: (profileId: string) => void;
+  onOpenProfile: (profileId: string) => void;
+  onSearch: () => void;
+  pendingInvitations: PendingInvitation[];
+  query: string;
+  results: ProfileSearchResult[];
+  searching: boolean;
+}) {
+  return (
+    <View style={styles.sectionBlock}>
+      <SectionHeading
+        caption="Search by username and track pending invites"
+        count={pendingInvitations.length}
+        title="INVITE DRIVERS"
+      />
+      <View style={styles.inviteCard}>
+        <View style={styles.searchRow}>
+          <View style={styles.searchInputShell}>
+            <Ionicons name="search" size={17} color={colors.textMuted} />
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={onChangeQuery}
+              onSubmitEditing={onSearch}
+              placeholder="Username"
+              placeholderTextColor={colors.textSubtle}
+              returnKeyType="search"
+              style={styles.searchInput}
+              value={query}
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={searching}
+            onPress={onSearch}
+            style={({ pressed }) => [
+              styles.searchButton,
+              pressed && styles.pressed,
+              searching && styles.disabled,
+            ]}>
+            {searching ? (
+              <ActivityIndicator color={colors.text} size="small" />
+            ) : (
+              <Text style={styles.searchButtonText}>SEARCH</Text>
+            )}
+          </Pressable>
+        </View>
+
+        {hasSearched && results.length === 0 ? (
+          <View style={styles.searchEmpty}>
+            <Text style={styles.managementEmptyText}>No matching drivers found.</Text>
+          </View>
+        ) : null}
+
+        {results.length > 0 ? (
+          <View style={styles.inviteList}>
+            <Text style={styles.inviteListLabel}>SEARCH RESULTS</Text>
+            {results.map((profile, index) => {
+              const isBusy = actionId === profile.id;
+              const isUnavailable = profile.isMember || Boolean(profile.pendingInvitationId);
+              return (
+                <View
+                  key={profile.id}
+                  style={[
+                    styles.inviteRow,
+                    index < results.length - 1 && styles.managementRowBorder,
+                  ]}>
+                  <Pressable
+                    accessibilityLabel={`Open ${displayName(profile)} profile`}
+                    accessibilityRole="button"
+                    onPress={() => onOpenProfile(profile.id)}
+                    style={({ pressed }) => [styles.managementProfile, pressed && styles.pressed]}>
+                    <ProfileAvatar profile={profile} size={42} />
+                    <View style={styles.personCopy}>
+                      <Text style={styles.personName}>{displayName(profile)}</Text>
+                      <Text style={styles.personMeta}>
+                        {profile.username ? `@${profile.username}` : "NOXA driver"}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isUnavailable || isBusy}
+                    onPress={() => onInvite(profile.id)}
+                    style={({ pressed }) => [
+                      styles.inviteButton,
+                      isUnavailable && styles.inviteButtonDisabled,
+                      pressed && styles.pressed,
+                      isBusy && styles.disabled,
+                    ]}>
+                    <Text style={[styles.inviteButtonText, isUnavailable && styles.inviteButtonDisabledText]}>
+                      {profile.isMember
+                        ? "MEMBER"
+                        : profile.pendingInvitationId
+                          ? "PENDING"
+                          : isBusy
+                            ? "SENDING…"
+                            : "INVITE"}
+                    </Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {pendingInvitations.length > 0 ? (
+          <View style={styles.inviteList}>
+            <Text style={styles.inviteListLabel}>PENDING INVITATIONS</Text>
+            {pendingInvitations.map((invitation, index) => {
+              const isBusy = actionId === invitation.id;
+              return (
+                <View
+                  key={invitation.id}
+                  style={[
+                    styles.inviteRow,
+                    index < pendingInvitations.length - 1 && styles.managementRowBorder,
+                  ]}>
+                  <Pressable
+                    accessibilityLabel={`Open ${displayName(invitation.invitedProfile)} profile`}
+                    accessibilityRole="button"
+                    onPress={() => onOpenProfile(invitation.invited_user_id)}
+                    style={({ pressed }) => [styles.managementProfile, pressed && styles.pressed]}>
+                    <ProfileAvatar profile={invitation.invitedProfile} size={42} />
+                    <View style={styles.personCopy}>
+                      <Text style={styles.personName}>{displayName(invitation.invitedProfile)}</Text>
+                      <Text style={styles.personMeta}>
+                        Invited by {displayName(invitation.invitedByProfile)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={isBusy}
+                    onPress={() => onCancelInvitation(invitation.id)}
+                    style={({ pressed }) => [
+                      styles.cancelInviteButton,
+                      pressed && styles.pressed,
+                      isBusy && styles.disabled,
+                    ]}>
+                    <Text style={styles.cancelInviteText}>{isBusy ? "…" : "CANCEL"}</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 export default function CrewDetailsScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const crewId = useMemo(() => normalizeId(id), [id]);
@@ -661,6 +916,7 @@ export default function CrewDetailsScreen() {
   const [inviteQuery, setInviteQuery] = useState("");
   const [inviteResults, setInviteResults] = useState<ProfileSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const requestId = useRef(0);
   const loadingRef = useRef(false);
 
@@ -1156,6 +1412,7 @@ export default function CrewDetailsScreen() {
           pendingInvitationId: pendingByUser.get(profile.id) ?? null,
         })),
     );
+    setHasSearched(true);
   }, [
     crew,
     currentUserId,
@@ -1181,6 +1438,7 @@ export default function CrewDetailsScreen() {
       }
       setInviteResults([]);
       setInviteQuery("");
+      setHasSearched(false);
       void loadCrew(false);
     },
     [crew, inviteActionId, loadCrew],
@@ -1317,164 +1575,45 @@ export default function CrewDetailsScreen() {
               vehiclesCount={vehicles.length}
             />
             {canManageCrew ? (
-              <NoxaCard>
-                <Text style={styles.cardTitle}>Join Requests</Text>
-                {joinRequests.length === 0 ? (
-                  <Text style={styles.emptyText}>
-                    No pending join requests.
-                  </Text>
-                ) : (
-                  <View style={styles.list}>
-                    {joinRequests.map((joinRequest) => (
-                      <View key={joinRequest.id} style={styles.personRow}>
-                        <ProfileAvatar profile={joinRequest.profile} />
-                        <View style={styles.personCopy}>
-                          <Text style={styles.personName}>
-                            {displayName(joinRequest.profile)}
-                          </Text>
-                          <Text style={styles.personMeta}>
-                            {joinRequest.profile?.username
-                              ? `@${joinRequest.profile.username}`
-                              : "NOXA driver"}
-                          </Text>
-                        </View>
-                        <View style={styles.requestActions}>
-                          <Pressable
-                            disabled={memberActionId === joinRequest.id}
-                            onPress={() =>
-                              void reviewJoinRequest(joinRequest.id, true)
-                            }
-                            style={({ pressed }) => [
-                              styles.miniAction,
-                              pressed && styles.pressed,
-                            ]}
-                          >
-                            <Text style={styles.miniActionText}>Approve</Text>
-                          </Pressable>
-                          <Pressable
-                            disabled={memberActionId === joinRequest.id}
-                            onPress={() =>
-                              void reviewJoinRequest(joinRequest.id, false)
-                            }
-                            style={({ pressed }) => [
-                              styles.miniAction,
-                              styles.miniActionDisabled,
-                              pressed && styles.pressed,
-                            ]}
-                          >
-                            <Text style={styles.miniActionText}>Reject</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </NoxaCard>
-            ) : null}
-            {canManageCrew ? (
-              <NoxaCard>
-                <Text style={styles.cardTitle}>Invite Member</Text>
-                <View style={styles.inlineRow}>
-                  <TextInput
-                    placeholder="Search username"
-                    placeholderTextColor={colors.textMuted}
-                    autoCapitalize="none"
-                    value={inviteQuery}
-                    onChangeText={setInviteQuery}
-                    style={styles.input}
-                  />
-                  <Pressable
-                    disabled={searching}
-                    onPress={() => void searchProfiles()}
-                    style={({ pressed }) => [
-                      styles.compactButton,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={styles.compactButtonText}>
-                      {searching ? "..." : "Search"}
-                    </Text>
-                  </Pressable>
-                </View>
-                {inviteResults.length > 0 ? (
-                  <View style={styles.list}>
-                    {inviteResults.map((profile) => (
-                      <View key={profile.id} style={styles.personRow}>
-                        <ProfileAvatar profile={profile} />
-                        <View style={styles.personCopy}>
-                          <Text style={styles.personName}>
-                            {displayName(profile)}
-                          </Text>
-                          <Text style={styles.personMeta}>
-                            {profile.username
-                              ? `@${profile.username}`
-                              : "NOXA driver"}
-                          </Text>
-                        </View>
-                        <Pressable
-                          disabled={
-                            profile.isMember ||
-                            Boolean(profile.pendingInvitationId) ||
-                            inviteActionId === profile.id
-                          }
-                          onPress={() => void inviteUser(profile.id)}
-                          style={({ pressed }) => [
-                            styles.miniAction,
-                            (profile.isMember ||
-                              Boolean(profile.pendingInvitationId)) &&
-                              styles.miniActionDisabled,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <Text style={styles.miniActionText}>
-                            {profile.isMember
-                              ? "Member"
-                              : profile.pendingInvitationId
-                                ? "Pending"
-                                : inviteActionId === profile.id
-                                  ? "Sending"
-                                  : "Invite"}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-                {pendingInvitations.length > 0 ? (
-                  <View style={styles.list}>
-                    <Text style={styles.subTitle}>Pending invitations</Text>
-                    {pendingInvitations.map((invite) => (
-                      <View key={invite.id} style={styles.personRow}>
-                        <ProfileAvatar profile={invite.invitedProfile} />
-                        <View style={styles.personCopy}>
-                          <Text style={styles.personName}>
-                            {displayName(invite.invitedProfile)}
-                          </Text>
-                          <Text style={styles.personMeta}>
-                            Pending
-                            {invite.invitedByProfile
-                              ? ` • by ${displayName(invite.invitedByProfile)}`
-                              : ""}
-                          </Text>
-                        </View>
-                        <Pressable
-                          disabled={inviteActionId === invite.id}
-                          onPress={() => void cancelInvitation(invite.id)}
-                          style={({ pressed }) => [
-                            styles.miniAction,
-                            styles.miniActionDisabled,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <Text style={styles.miniActionText}>
-                            {inviteActionId === invite.id ? "..." : "Cancel"}
-                          </Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </NoxaCard>
+              <>
+                <JoinRequestsPanel
+                  actionId={memberActionId}
+                  onOpenProfile={(profileId) =>
+                    router.push({
+                      pathname: "/driver-profile/[id]",
+                      params: { id: profileId },
+                    })
+                  }
+                  onReview={(requestId, approve) =>
+                    void reviewJoinRequest(requestId, approve)
+                  }
+                  requests={joinRequests}
+                />
+                <InviteManager
+                  actionId={inviteActionId}
+                  hasSearched={hasSearched}
+                  onCancelInvitation={(invitationId) =>
+                    void cancelInvitation(invitationId)
+                  }
+                  onChangeQuery={(value) => {
+                    setInviteQuery(value);
+                    setInviteResults([]);
+                    setHasSearched(false);
+                  }}
+                  onInvite={(profileId) => void inviteUser(profileId)}
+                  onOpenProfile={(profileId) =>
+                    router.push({
+                      pathname: "/driver-profile/[id]",
+                      params: { id: profileId },
+                    })
+                  }
+                  onSearch={() => void searchProfiles()}
+                  pendingInvitations={pendingInvitations}
+                  query={inviteQuery}
+                  results={inviteResults}
+                  searching={searching}
+                />
+              </>
             ) : null}
             <MemberRoster
               currentUserId={currentUserId}
@@ -1746,24 +1885,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-  cardTitle: {
-    color: colors.text,
-    fontSize: typography.cardTitle,
-    fontWeight: "900",
-    marginBottom: spacing.md,
-  },
   bodyText: {
     color: colors.textMuted,
     fontSize: 13,
     fontWeight: "600",
     lineHeight: 20,
-  },
-  list: { gap: spacing.md },
-  personRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    borderRadius: radius.button,
   },
   personCopy: { flex: 1, gap: 2 },
   personName: {
@@ -1775,42 +1901,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: "700",
-  },
-  input: {
-    flex: 1,
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.button,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSoft,
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "700",
-  },
-  inlineRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  compactButton: {
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.button,
-    backgroundColor: colors.primary,
-  },
-  compactButtonText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: "900",
-  },
-  subTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "900",
   },
   sectionBlock: { gap: spacing.sm },
   sectionHeading: {
@@ -1899,31 +1989,153 @@ const styles = StyleSheet.create({
   roleActionText: { color: colors.textMuted, fontSize: 10, fontWeight: "900" },
   promoteActionText: { color: colors.primaryHover, fontSize: 10, fontWeight: "900" },
   removeActionText: { color: colors.primaryHover, fontSize: 10, fontWeight: "900" },
-  requestActions: { flexDirection: "row", gap: spacing.sm },
-  miniAction: {
-    minHeight: 32,
-    paddingHorizontal: spacing.md,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    backgroundColor: colors.primary,
-  },
-  miniActionDisabled: {
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  miniActionText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: "900",
-  },
   emptyText: {
     color: colors.textMuted,
     fontSize: typography.body,
     fontWeight: "700",
     lineHeight: 22,
   },
+  managementEmpty: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  managementEmptyText: { color: colors.textMuted, fontSize: 11, fontWeight: "700" },
+  managementCard: {
+    overflow: "hidden",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  managementRow: {
+    minHeight: 74,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  managementRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  managementProfile: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderRadius: radius.md,
+  },
+  requestActionBar: { flexDirection: "row", gap: spacing.xs },
+  iconDecisionButton: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  approveButton: { borderColor: colors.primary, backgroundColor: colors.primary },
+  rejectButton: { borderColor: colors.borderStrong, backgroundColor: colors.surfaceSoft },
+  inviteCard: {
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  searchRow: { flexDirection: "row", gap: spacing.xs },
+  searchInputShell: {
+    minHeight: 46,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.input,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceRaised,
+  },
+  searchInput: {
+    flex: 1,
+    minHeight: 44,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  searchButton: {
+    minWidth: 82,
+    minHeight: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.button,
+    backgroundColor: colors.primary,
+  },
+  searchButtonText: { color: colors.text, fontSize: 10, fontWeight: "900", letterSpacing: 0.6 },
+  searchEmpty: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
+  },
+  inviteList: {
+    overflow: "hidden",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  inviteListLabel: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+    color: colors.textSubtle,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  inviteRow: {
+    minHeight: 68,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  inviteButton: {
+    minHeight: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  inviteButtonDisabled: { borderColor: colors.border, backgroundColor: colors.surfaceSoft },
+  inviteButtonText: { color: colors.text, fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  inviteButtonDisabledText: { color: colors.textMuted },
+  cancelInviteButton: {
+    minHeight: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primarySubtle,
+  },
+  cancelInviteText: { color: colors.primaryHover, fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
   garageRail: { gap: spacing.md, paddingRight: spacing.lg },
   garageCard: {
     width: 224,
