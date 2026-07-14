@@ -68,17 +68,18 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
-declare actor uuid := (select auth.uid()); actor_role text; owner_id uuid; invite_id uuid;
+declare actor uuid := (select auth.uid()); actor_role text; crew_owner_id
+  uuid; invite_id uuid;
 begin
   if actor is null or target_crew_id is null or target_user_id is null then raise exception 'not allowed'; end if;
-  select owner_id into owner_id from public.crews where id = target_crew_id;
-  if owner_id is null then raise exception 'crew not found'; end if;
-  select role into actor_role from public.crew_members where crew_id = target_crew_id and user_id = actor;
+  select public.crews.owner_id into crew_owner_id from public.crews where public.crews.id = target_crew_id;
+  if crew_owner_id is null then raise exception 'crew not found'; end if;
+  select public.crew_members.role into actor_role from public.crew_members where public.crew_members.crew_id = target_crew_id and public.crew_members.user_id = actor;
   if actor_role not in ('owner','admin') then raise exception 'not allowed'; end if;
-  if target_user_id = owner_id then raise exception 'cannot invite owner'; end if;
+  if target_user_id = crew_owner_id then raise exception 'cannot invite owner'; end if;
   if not exists (select 1 from public.profiles where id = target_user_id) then raise exception 'profile not found'; end if;
-  if exists (select 1 from public.crew_members where crew_id = target_crew_id and user_id = target_user_id) then raise exception 'already member'; end if;
-  select id into invite_id from public.crew_invitations where crew_id = target_crew_id and invited_user_id = target_user_id and status = 'pending';
+  if exists (select 1 from public.crew_members where public.crew_members.crew_id = target_crew_id and public.crew_members.user_id = target_user_id) then raise exception 'already member'; end if;
+  select public.crew_invitations.id into invite_id from public.crew_invitations where public.crew_invitations.crew_id = target_crew_id and invited_user_id = target_user_id and status = 'pending';
   if invite_id is not null then return invite_id; end if;
   insert into public.crew_invitations (crew_id, invited_user_id, invited_by) values (target_crew_id, target_user_id, actor) returning id into invite_id;
   return invite_id;
@@ -163,15 +164,6 @@ begin
   raise exception 'not allowed';
 end;
 $$;
-
--- C16C1 join-request compatibility when table/function exists in applied environments.
-do $$
-begin
-  if to_regclass('public.crew_join_requests') is not null then
-    drop policy if exists "NOXA managers can read crew join requests" on public.crew_join_requests;
-    execute 'create policy "NOXA managers can read crew join requests" on public.crew_join_requests for select to authenticated using (requester_id = (select auth.uid()) or public.noxa_is_crew_manager(crew_id))';
-  end if;
-end $$;
 
 revoke all privileges on function public.noxa_is_crew_manager(uuid) from public, anon, authenticated;
 revoke all privileges on function public.noxa_can_view_crew(uuid) from public, anon, authenticated;
