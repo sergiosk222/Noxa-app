@@ -1,6 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -123,7 +129,13 @@ function vehicleName(vehicle: Vehicle) {
   );
 }
 
-function Header() {
+function Header({
+  onRefresh,
+  refreshing,
+}: {
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
   return (
     <View style={styles.header}>
       <Pressable
@@ -137,8 +149,23 @@ function Header() {
       >
         <Ionicons name="chevron-back" size={22} color={colors.text} />
       </Pressable>
-      <Text style={styles.headerTitle}>CREW</Text>
-      <View style={styles.headerButtonPlaceholder} />
+      <View style={styles.headerCopy}>
+        <Text style={styles.headerTitle}>CREW PROFILE</Text>
+        <Text style={styles.headerSubtitle}>Community details</Text>
+      </View>
+      <Pressable
+        accessibilityLabel="Refresh crew"
+        accessibilityRole="button"
+        disabled={refreshing}
+        onPress={onRefresh}
+        style={({ pressed }) => [
+          styles.headerButton,
+          pressed && styles.pressed,
+          refreshing && styles.disabled,
+        ]}
+      >
+        <Ionicons name="refresh" size={18} color={colors.textMuted} />
+      </Pressable>
     </View>
   );
 }
@@ -184,6 +211,206 @@ function ProfileAvatar({
     />
   ) : (
     <NoxaAvatar initials={initials(name)} size={size} />
+  );
+}
+
+function joinPolicyLabel(policy: JoinPolicy) {
+  if (policy === "open") return "OPEN JOIN";
+  if (policy === "approval") return "BY APPROVAL";
+  return "INVITE ONLY";
+}
+
+function MembershipAction({
+  effectiveJoinPolicy,
+  isMember,
+  isOwner,
+  joining,
+  leaving,
+  onCancelRequest,
+  onJoin,
+  onLeave,
+  onRequestJoin,
+  pendingJoinRequest,
+}: {
+  effectiveJoinPolicy: JoinPolicy;
+  isMember: boolean;
+  isOwner: boolean;
+  joining: boolean;
+  leaving: boolean;
+  onCancelRequest: () => void;
+  onJoin: () => void;
+  onLeave: () => void;
+  onRequestJoin: () => void;
+  pendingJoinRequest: JoinRequest | null;
+}) {
+  if (isOwner) {
+    return (
+      <View style={styles.ownerStatus}>
+        <Ionicons name="shield-checkmark" size={18} color={colors.primaryHover} />
+        <View style={styles.ownerStatusCopy}>
+          <Text style={styles.ownerStatusTitle}>OWNER ACCESS</Text>
+          <Text style={styles.ownerStatusText}>You manage this crew.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (isMember) {
+    return (
+      <NoxaButton
+        disabled={leaving || joining}
+        fullWidth
+        onPress={onLeave}
+        title={leaving ? "Leaving…" : "Leave Crew"}
+        variant="danger"
+      />
+    );
+  }
+
+  if (pendingJoinRequest) {
+    return (
+      <NoxaButton
+        disabled={joining || leaving}
+        fullWidth
+        onPress={onCancelRequest}
+        title={joining ? "Cancelling…" : "Cancel Join Request"}
+        variant="secondary"
+      />
+    );
+  }
+
+  if (effectiveJoinPolicy === "open") {
+    return (
+      <NoxaButton
+        disabled={joining || leaving}
+        fullWidth
+        onPress={onJoin}
+        title={joining ? "Joining…" : "Join Crew"}
+      />
+    );
+  }
+
+  if (effectiveJoinPolicy === "approval") {
+    return (
+      <NoxaButton
+        disabled={joining || leaving}
+        fullWidth
+        onPress={onRequestJoin}
+        title={joining ? "Requesting…" : "Request to Join"}
+      />
+    );
+  }
+
+  return <NoxaButton disabled fullWidth title="Invite Only" variant="secondary" />;
+}
+
+function CrewOverview({
+  crew,
+  membersCount,
+  membershipAction,
+  onOpenOwner,
+  owner,
+  vehiclesCount,
+}: {
+  crew: Crew;
+  membersCount: number;
+  membershipAction: ReactNode;
+  onOpenOwner?: () => void;
+  owner: Profile | null;
+  vehiclesCount: number;
+}) {
+  return (
+    <View style={styles.heroCard}>
+      {crew.cover_image_url ? (
+        <ImageBackground
+          imageStyle={styles.coverRadius as ImageStyle}
+          resizeMode="cover"
+          source={{ uri: crew.cover_image_url }}
+          style={styles.cover}>
+          <View style={styles.coverShade} />
+        </ImageBackground>
+      ) : (
+        <View style={[styles.cover, styles.coverPlaceholder]}>
+          <View style={styles.coverGlowLarge} />
+          <View style={styles.coverGlowSmall} />
+          <Ionicons name="people" size={76} color={colors.primaryMuted} />
+          <View style={styles.coverShade} />
+        </View>
+      )}
+
+      <View style={styles.heroBadges}>
+        <NoxaBadge
+          label={crew.is_public ? "PUBLIC" : "PRIVATE"}
+          variant={crew.is_public ? "primary" : "default"}
+        />
+        <View style={styles.policyBadge}>
+          <Text style={styles.policyBadgeText}>
+            {joinPolicyLabel(crew.is_public ? crew.join_policy : "invite_only")}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.heroContent}>
+        <View style={styles.heroIdentityRow}>
+          <View style={styles.logoWrap}>
+            {crew.logo_url ? (
+              <Image source={{ uri: crew.logo_url }} style={styles.logo} />
+            ) : (
+              <Text style={styles.logoInitials}>{initials(crew.name)}</Text>
+            )}
+          </View>
+          <View style={styles.heroIdentityCopy}>
+            <Text style={styles.heroTitle}>{crew.name}</Text>
+            <View style={styles.heroMetaRow}>
+              <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+              <Text style={styles.heroMeta}>{crew.city || "Global crew"}</Text>
+            </View>
+          </View>
+        </View>
+
+        {isPresent(crew.description) ? (
+          <Text style={styles.bodyText}>{crew.description}</Text>
+        ) : (
+          <Text style={styles.bodyText}>This crew has not added a description yet.</Text>
+        )}
+
+        <View style={styles.statsStrip}>
+          <View style={styles.statCell}>
+            <Text style={styles.statValue}>{membersCount}</Text>
+            <Text style={styles.statLabel}>DRIVERS</Text>
+          </View>
+          <View style={[styles.statCell, styles.statCellBorder]}>
+            <Text style={styles.statValue}>{vehiclesCount}</Text>
+            <Text style={styles.statLabel}>PUBLIC CARS</Text>
+          </View>
+          <View style={[styles.statCell, styles.statCellBorder]}>
+            <Ionicons
+              name={crew.is_public ? "earth-outline" : "lock-closed-outline"}
+              size={20}
+              color={colors.text}
+            />
+            <Text style={styles.statLabel}>{crew.is_public ? "VISIBLE" : "PRIVATE"}</Text>
+          </View>
+        </View>
+
+        {owner ? (
+          <Pressable
+            accessibilityLabel="Open owner driver profile"
+            accessibilityRole="button"
+            onPress={onOpenOwner}
+            style={({ pressed }) => [styles.ownerRow, pressed && styles.pressed]}>
+            <ProfileAvatar profile={owner} size={42} />
+            <View style={styles.personCopy}>
+              <Text style={styles.ownerLabel}>CREW OWNER</Text>
+              <Text style={styles.personName}>{displayName(owner)}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.textSubtle} />
+          </Pressable>
+        ) : null}
+
+        <View style={styles.membershipAction}>{membershipAction}</View>
+      </View>
+    </View>
   );
 }
 
@@ -658,8 +885,7 @@ export default function CrewDetailsScreen() {
               .from("crew_members")
               .delete()
               .eq("crew_id", crew.id)
-              .eq("user_id", currentUserId)
-              .eq("role", "member");
+              .eq("user_id", currentUserId);
             setLeaving(false);
             if (leaveError) {
               Alert.alert("Could not leave", "Please try again.");
@@ -828,7 +1054,7 @@ export default function CrewDetailsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
-        <Header />
+        <Header onRefresh={() => void loadCrew()} refreshing={loading} />
         {loading ? <StateCard loading title="Loading crew..." /> : null}
         {!loading && error ? (
           <StateCard
@@ -838,131 +1064,35 @@ export default function CrewDetailsScreen() {
         ) : null}
         {!loading && !error && crew ? (
           <>
-            <View style={styles.heroCard}>
-              {crew.cover_image_url ? (
-                <ImageBackground
-                  source={{ uri: crew.cover_image_url }}
-                  resizeMode="cover"
-                  style={styles.cover}
-                  imageStyle={styles.coverRadius as ImageStyle}
-                >
-                  {null}
-                </ImageBackground>
-              ) : (
-                <View style={[styles.cover, styles.coverPlaceholder]}>
-                  <Ionicons
-                    name="people"
-                    size={72}
-                    color="rgba(255,45,45,0.34)"
-                  />
-                </View>
-              )}
-              <View style={styles.heroContent}>
-                <View style={styles.logoWrap}>
-                  {crew.logo_url ? (
-                    <Image
-                      source={{ uri: crew.logo_url }}
-                      style={styles.logo}
-                    />
-                  ) : (
-                    <Text style={styles.logoInitials}>
-                      {initials(crew.name)}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.heroTitle}>{crew.name}</Text>
-                {crew.city ? (
-                  <Text style={styles.heroMeta}>{crew.city}</Text>
-                ) : null}
-                <NoxaBadge
-                  label={crew.is_public ? "PUBLIC" : "PRIVATE"}
-                  variant={crew.is_public ? "primary" : "default"}
+            <CrewOverview
+              crew={crew}
+              membersCount={members.length}
+              membershipAction={
+                <MembershipAction
+                  effectiveJoinPolicy={effectiveJoinPolicy}
+                  isMember={isMember}
+                  isOwner={isOwner}
+                  joining={joining}
+                  leaving={leaving}
+                  onCancelRequest={cancelJoinRequest}
+                  onJoin={joinCrew}
+                  onLeave={leaveCrew}
+                  onRequestJoin={requestJoinCrew}
+                  pendingJoinRequest={pendingJoinRequest}
                 />
-              </View>
-            </View>
-            <View style={styles.statsRow}>
-              <NoxaCard style={styles.statCard}>
-                <Text style={styles.statValue}>{members.length}</Text>
-                <Text style={styles.statLabel}>Drivers</Text>
-              </NoxaCard>
-              <NoxaCard style={styles.statCard}>
-                <Text style={styles.statValue}>{vehicles.length}</Text>
-                <Text style={styles.statLabel}>Cars</Text>
-              </NoxaCard>
-            </View>
-            {isPresent(crew.description) ? (
-              <NoxaCard>
-                <Text style={styles.cardTitle}>Description</Text>
-                <Text style={styles.bodyText}>{crew.description}</Text>
-              </NoxaCard>
-            ) : null}
-            <NoxaCard>
-              <Text style={styles.cardTitle}>Membership</Text>
-              {isOwner ? (
-                <NoxaButton title="Owner" disabled />
-              ) : isMember ? (
-                <NoxaButton
-                  title={leaving ? "Leaving..." : "Leave Crew"}
-                  variant="danger"
-                  disabled={leaving || joining}
-                  onPress={leaveCrew}
-                />
-              ) : pendingJoinRequest ? (
-                <NoxaButton
-                  title={joining ? "Cancelling..." : "Cancel Request"}
-                  variant="secondary"
-                  disabled={joining || leaving}
-                  onPress={cancelJoinRequest}
-                />
-              ) : effectiveJoinPolicy === "open" ? (
-                <NoxaButton
-                  title={joining ? "Joining..." : "Join Crew"}
-                  disabled={joining || leaving}
-                  onPress={joinCrew}
-                />
-              ) : effectiveJoinPolicy === "approval" ? (
-                <NoxaButton
-                  title={joining ? "Requesting..." : "Request to Join"}
-                  disabled={joining || leaving}
-                  onPress={requestJoinCrew}
-                />
-              ) : (
-                <NoxaButton title="Invite Only" disabled />
-              )}
-            </NoxaCard>
-            {owner ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open owner driver profile"
-                onPress={() =>
-                  router.push({
-                    pathname: "/driver-profile/[id]",
-                    params: { id: owner.id },
-                  })
-                }
-                style={({ pressed }) => [pressed && styles.pressed]}
-              >
-                <NoxaCard>
-                  <Text style={styles.cardTitle}>Owner</Text>
-                  <View style={styles.personRow}>
-                    <ProfileAvatar profile={owner} />
-                    <View style={styles.personCopy}>
-                      <Text style={styles.personName}>
-                        {displayName(owner)}
-                      </Text>
-                      <Text style={styles.personMeta}>
-                        {[
-                          owner.username ? `@${owner.username}` : null,
-                          owner.city,
-                        ]
-                          .filter(isPresent)
-                          .join(" • ")}
-                      </Text>
-                    </View>
-                  </View>
-                </NoxaCard>
-              </Pressable>
-            ) : null}
+              }
+              onOpenOwner={
+                owner
+                  ? () =>
+                      router.push({
+                        pathname: "/driver-profile/[id]",
+                        params: { id: owner.id },
+                      })
+                  : undefined
+              }
+              owner={owner}
+              vehiclesCount={vehicles.length}
+            />
             {canManageCrew ? (
               <NoxaCard>
                 <Text style={styles.cardTitle}>Join Requests</Text>
@@ -1308,10 +1438,10 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   header: {
-    minHeight: 48,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: spacing.md,
   },
   headerButton: {
     width: 44,
@@ -1323,14 +1453,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  headerButtonPlaceholder: { width: 44, height: 44 },
+  headerCopy: { flex: 1 },
   headerTitle: {
     color: colors.text,
-    fontSize: typography.caption,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.sectionTitle,
     fontWeight: "900",
-    letterSpacing: 2.4,
+    letterSpacing: -0.3,
+    lineHeight: 28,
+  },
+  headerSubtitle: {
+    marginTop: spacing.xxs,
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: "700",
   },
   pressed: { opacity: 0.86, transform: [{ translateY: 1 }, { scale: 0.98 }] },
+  disabled: { opacity: 0.5 },
   stateCard: { gap: spacing.md, alignItems: "center" },
   stateTitle: {
     color: colors.text,
@@ -1353,22 +1492,77 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadows.card,
   },
-  cover: { height: 180, justifyContent: "center", alignItems: "center" },
+  cover: {
+    height: 210,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
   coverRadius: {
     borderTopLeftRadius: radius.card,
     borderTopRightRadius: radius.card,
   },
   coverPlaceholder: { backgroundColor: colors.surfaceSoft },
-  heroContent: {
+  coverShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(6,6,10,0.34)",
+  },
+  coverGlowLarge: {
+    position: "absolute",
+    right: -42,
+    top: -76,
+    width: 230,
+    height: 230,
+    borderRadius: 115,
+    backgroundColor: colors.primaryMuted,
+  },
+  coverGlowSmall: {
+    position: "absolute",
+    left: 18,
+    bottom: -54,
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    borderWidth: 24,
+    borderColor: colors.primarySubtle,
+  },
+  heroBadges: {
+    position: "absolute",
+    top: spacing.sm,
+    right: spacing.sm,
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  policyBadge: {
+    minHeight: 26,
     alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.lg,
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: "rgba(6,6,10,0.76)",
+  },
+  policyBadgeText: {
+    color: colors.textMuted,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  heroContent: {
+    gap: spacing.lg,
+    padding: spacing.md,
+  },
+  heroIdentityRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.md,
     marginTop: -46,
   },
   logoWrap: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 78,
+    height: 78,
+    borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceSoft,
@@ -1377,27 +1571,102 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   logo: { width: "100%", height: "100%" },
-  logoInitials: { color: colors.text, fontSize: 30, fontWeight: "900" },
+  logoInitials: {
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: 28,
+    fontWeight: "900",
+  },
+  heroIdentityCopy: { flex: 1, minWidth: 0, paddingBottom: spacing.xxs },
   heroTitle: {
     color: colors.text,
-    fontSize: typography.h1,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.h2,
     fontWeight: "900",
-    textAlign: "center",
-    letterSpacing: -0.8,
+    letterSpacing: 0.2,
+    lineHeight: typography.lineHeight.h2,
+    textTransform: "uppercase",
+  },
+  heroMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+    marginTop: 2,
   },
   heroMeta: {
     color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "700",
   },
-  statsRow: { flexDirection: "row", gap: spacing.md },
-  statCard: { flex: 1, alignItems: "center" },
-  statValue: { color: colors.text, fontSize: typography.h1, fontWeight: "900" },
+  statsStrip: {
+    minHeight: 72,
+    flexDirection: "row",
+    overflow: "hidden",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  statCell: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingVertical: spacing.sm,
+  },
+  statCellBorder: { borderLeftWidth: 1, borderLeftColor: colors.divider },
+  statValue: {
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.title,
+    fontWeight: "900",
+    lineHeight: 25,
+  },
   statLabel: {
+    color: colors.textSubtle,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  ownerRow: {
+    minHeight: 62,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSoft,
+  },
+  ownerLabel: {
+    color: colors.primaryHover,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  membershipAction: { gap: spacing.sm },
+  ownerStatus: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primarySubtle,
+  },
+  ownerStatusCopy: { flex: 1 },
+  ownerStatusTitle: {
+    color: colors.primaryHover,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  ownerStatusText: {
+    marginTop: 2,
     color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "800",
-    textTransform: "uppercase",
+    fontSize: 10,
+    fontWeight: "700",
   },
   cardTitle: {
     color: colors.text,
@@ -1407,9 +1676,9 @@ const styles = StyleSheet.create({
   },
   bodyText: {
     color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: "700",
-    lineHeight: 23,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 20,
   },
   list: { gap: spacing.md },
   personRow: {
