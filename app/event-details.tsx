@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -13,26 +14,26 @@ import {
   Text,
   View,
 } from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
-import { NoxaBadge, NoxaButton, NoxaScreen } from "@/src/components/ui";
+import { NoxaButton, NoxaScreen } from "@/src/components/ui";
+import {
+  eventLifecycle,
+  formatEventDate,
+  formatEventDateTime,
+  formatEventTime,
+  initials,
+  lifecycleLabel,
+  uuidPattern,
+  type EventExperienceRow,
+  type EventLifecycle,
+  type EventResponse,
+} from "@/src/lib/eventExperience";
 import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 
-type EventRow = {
-  id: string;
-  creator_id: string;
-  crew_id: string | null;
-  title: string;
-  description: string | null;
-  location_name: string;
-  starts_at: string;
-  ends_at: string | null;
-  cover_image_url: string | null;
-  is_public: boolean;
-  status: string;
-  created_at: string;
-  updated_at: string;
-};
+const eventGalleryBucket = "event-gallery";
+
 type CreatorProfile = {
   id: string;
   display_name: string | null;
@@ -44,80 +45,83 @@ type EventCrew = {
   id: string;
   name: string;
   logo_url: string | null;
+  cover_image_url: string | null;
   city: string | null;
 };
+type AttendanceRow = {
+  user_id: string;
+  response: EventResponse;
+  joined_at: string;
+};
+type GalleryPreviewRow = {
+  id: string;
+  object_path: string;
+};
+type GalleryPreview = GalleryPreviewRow & { signedUrl: string };
 
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function displayName(profile: CreatorProfile | null) {
+  return profile?.display_name || profile?.username || "NOXA driver";
+}
 
 function HeaderAction({
   icon,
   label,
+  disabled,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
-  onPress?: () => void;
+  disabled?: boolean;
+  onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.headerAction, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.headerAction,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
+      ]}
     >
-      <Ionicons name={icon} size={21} color={colors.text} />
+      <Ionicons name={icon} size={19} color={colors.text} />
     </Pressable>
   );
 }
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(value));
-}
-function formatTime(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-function displayName(profile: CreatorProfile | null) {
-  return profile?.display_name || profile?.username || "NOXA driver";
-}
-function profileHandle(profile: CreatorProfile) {
-  if (!profile.username) return profile.city ?? "NOXA member";
-  return profile.username.startsWith("@") ? profile.username : `@${profile.username}`;
-}
 
-function EventInfoCell({
-  icon,
-  label,
-  value,
-  leftBorder = false,
-  bottomBorder = false,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-  leftBorder?: boolean;
-  bottomBorder?: boolean;
-}) {
+function LifecycleBadge({ lifecycle }: { lifecycle: EventLifecycle }) {
+  const completed = lifecycle === "completed";
+  const soon = lifecycle === "soon";
+  const neutral = lifecycle === "upcoming";
   return (
-    <View style={[styles.infoCell, leftBorder && styles.infoCellLeftBorder, bottomBorder && styles.infoCellBottomBorder]}>
-      <View style={styles.infoIcon}><Ionicons name={icon} size={18} color={colors.primaryHover} /></View>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text numberOfLines={2} style={styles.infoValue}>{value}</Text>
+    <View
+      style={[
+        styles.lifecycleBadge,
+        completed && styles.lifecycleBadgeComplete,
+        soon && styles.lifecycleBadgeSoon,
+        neutral && styles.lifecycleBadgeNeutral,
+      ]}
+    >
+      <View
+        style={[
+          styles.lifecycleDot,
+          completed && styles.lifecycleDotComplete,
+          soon && styles.lifecycleDotSoon,
+          neutral && styles.lifecycleDotNeutral,
+        ]}
+      />
+      <Text
+        style={[
+          styles.lifecycleText,
+          completed && styles.lifecycleTextComplete,
+          soon && styles.lifecycleTextSoon,
+          neutral && styles.lifecycleTextNeutral,
+        ]}
+      >
+        {lifecycleLabel(lifecycle)}
+      </Text>
     </View>
   );
 }
@@ -125,17 +129,20 @@ function EventInfoCell({
 export default function EventDetailsScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const eventId = typeof params.id === "string" ? params.id : "";
-  const [event, setEvent] = useState<EventRow | null>(null);
+  const [event, setEvent] = useState<EventExperienceRow | null>(null);
   const [creator, setCreator] = useState<CreatorProfile | null>(null);
   const [eventCrew, setEventCrew] = useState<EventCrew | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [attendeeCount, setAttendeeCount] = useState(0);
+  const [goingCount, setGoingCount] = useState(0);
+  const [maybeCount, setMaybeCount] = useState(0);
   const [attendees, setAttendees] = useState<CreatorProfile[]>([]);
-  const [isAttending, setIsAttending] = useState(false);
+  const [myResponse, setMyResponse] = useState<EventResponse | null>(null);
+  const [gallery, setGallery] = useState<GalleryPreview[]>([]);
+  const [galleryCount, setGalleryCount] = useState(0);
+  const [isSaved, setIsSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,57 +152,112 @@ export default function EventDetailsScreen() {
     () => Boolean(event && currentUserId === event.creator_id),
     [currentUserId, event],
   );
+  const lifecycle = useMemo(
+    () => (event ? eventLifecycle(event) : "upcoming"),
+    [event],
+  );
+  const rsvpClosed = lifecycle === "completed" || lifecycle === "cancelled";
+  const canChat = isHost || myResponse !== null;
+  const capacityProgress = event?.capacity
+    ? Math.min(1, goingCount / event.capacity)
+    : 0;
 
   const loadAttendance = useCallback(
     async (id: string, userId: string | null) => {
-      const { count, error: countError } = await supabase
-        .from("event_attendees")
-        .select("event_id", { count: "exact", head: true })
-        .eq("event_id", id);
-      if (countError) throw countError;
-      setAttendeeCount(count ?? 0);
-      const { data: attendeeRows, error: attendeesError } = await supabase
-        .from("event_attendees")
-        .select("user_id")
-        .eq("event_id", id)
-        .order("joined_at", { ascending: true })
-        .limit(4);
-      if (attendeesError) throw attendeesError;
-      const attendeeIds = (attendeeRows ?? []).map((row) => row.user_id);
-      if (attendeeIds.length > 0) {
-        const { data: attendeeProfiles, error: profilesError } = await supabase
-          .from("profiles")
-          .select("id,display_name,username,avatar_url,city")
-          .in("id", attendeeIds);
-        if (profilesError) throw profilesError;
-        const profilesById = new Map(
-          ((attendeeProfiles ?? []) as CreatorProfile[]).map((profile) => [profile.id, profile]),
-        );
-        setAttendees(attendeeIds.map((attendeeId) => profilesById.get(attendeeId)).filter((profile): profile is CreatorProfile => Boolean(profile)));
-      } else {
-        setAttendees([]);
-      }
-      if (userId) {
-        const { data, error: mineError } = await supabase
+      const [goingResult, maybeResult, attendeesResult, mineResult] = await Promise.all([
+        supabase
           .from("event_attendees")
-          .select("event_id")
+          .select("event_id", { count: "exact", head: true })
           .eq("event_id", id)
-          .eq("user_id", userId)
-          .maybeSingle();
-        if (mineError) throw mineError;
-        setIsAttending(Boolean(data));
-      } else setIsAttending(false);
+          .eq("response", "going"),
+        supabase
+          .from("event_attendees")
+          .select("event_id", { count: "exact", head: true })
+          .eq("event_id", id)
+          .eq("response", "maybe"),
+        supabase
+          .from("event_attendees")
+          .select("user_id,response,joined_at")
+          .eq("event_id", id)
+          .eq("response", "going")
+          .order("joined_at", { ascending: true })
+          .limit(4),
+        userId
+          ? supabase
+              .from("event_attendees")
+              .select("user_id,response,joined_at")
+              .eq("event_id", id)
+              .eq("user_id", userId)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ]);
+      const attendanceError =
+        goingResult.error || maybeResult.error || attendeesResult.error || mineResult.error;
+      if (attendanceError) throw attendanceError;
+      setGoingCount(goingResult.count ?? 0);
+      setMaybeCount(maybeResult.count ?? 0);
+      setMyResponse(
+        mineResult.data ? (mineResult.data as AttendanceRow).response : null,
+      );
+
+      const attendeeIds = ((attendeesResult.data ?? []) as AttendanceRow[]).map(
+        (row) => row.user_id,
+      );
+      if (!attendeeIds.length) {
+        setAttendees([]);
+        return;
+      }
+      const { data: profileRows, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id,display_name,username,avatar_url,city")
+        .in("id", attendeeIds);
+      if (profilesError) throw profilesError;
+      const byId = new Map(
+        ((profileRows ?? []) as CreatorProfile[]).map((profile) => [profile.id, profile]),
+      );
+      setAttendees(
+        attendeeIds
+          .map((idValue) => byId.get(idValue))
+          .filter((profile): profile is CreatorProfile => Boolean(profile)),
+      );
     },
     [],
   );
+
+  const loadGallery = useCallback(async (id: string) => {
+    const [itemsResult, countResult] = await Promise.all([
+      supabase
+        .from("event_gallery_items")
+        .select("id,object_path")
+        .eq("event_id", id)
+        .order("created_at", { ascending: false })
+        .limit(3),
+      supabase
+        .from("event_gallery_items")
+        .select("event_id", { count: "exact", head: true })
+        .eq("event_id", id),
+    ]);
+    if (itemsResult.error || countResult.error) {
+      throw itemsResult.error || countResult.error;
+    }
+    setGalleryCount(countResult.count ?? 0);
+    const signed = await Promise.all(
+      ((itemsResult.data ?? []) as GalleryPreviewRow[]).map(async (item) => {
+        const { data, error: signedError } = await supabase.storage
+          .from(eventGalleryBucket)
+          .createSignedUrl(item.object_path, 60 * 60);
+        if (signedError || !data?.signedUrl) return null;
+        return { ...item, signedUrl: data.signedUrl } satisfies GalleryPreview;
+      }),
+    );
+    setGallery(signed.filter((item): item is GalleryPreview => Boolean(item)));
+  }, []);
 
   const loadEvent = useCallback(async () => {
     setLoading(true);
     setError(null);
     setNotFound(false);
     if (!uuidPattern.test(eventId)) {
-      setEventCrew(null);
-      setIsSaved(false);
       setNotFound(true);
       setLoading(false);
       return;
@@ -218,95 +280,100 @@ export default function EventDetailsScreen() {
       setLoading(false);
       return;
     }
-    const loadedEvent = eventData as EventRow;
-    setEvent(loadedEvent);
+    const nextEvent = eventData as EventExperienceRow;
+    setEvent(nextEvent);
+
     const [profileResult, crewResult, savedResult] = await Promise.all([
       supabase
         .from("profiles")
         .select("id,display_name,username,avatar_url,city")
-        .eq("id", loadedEvent.creator_id)
+        .eq("id", nextEvent.creator_id)
         .maybeSingle(),
-      loadedEvent.crew_id
+      nextEvent.crew_id
         ? supabase
             .from("crews")
-            .select("id,name,logo_url,city")
-            .eq("id", loadedEvent.crew_id)
+            .select("id,name,logo_url,cover_image_url,city")
+            .eq("id", nextEvent.crew_id)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
       userId
         ? supabase
             .from("saved_events")
             .select("event_id")
-            .eq("event_id", loadedEvent.id)
+            .eq("event_id", nextEvent.id)
             .eq("user_id", userId)
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
     const detailError = profileResult.error || crewResult.error;
-    if (detailError) {
-      setError(detailError.message);
-      setLoading(false);
-      return;
-    }
+    if (detailError) setError(detailError.message);
     setCreator((profileResult.data as CreatorProfile | null) ?? null);
     setEventCrew((crewResult.data as EventCrew | null) ?? null);
     setIsSaved(savedResult.error ? false : Boolean(savedResult.data));
-    if (savedResult.error) setError("Event loaded, but its saved status is unavailable.");
+
     try {
-      await loadAttendance(loadedEvent.id, userId);
-    } catch (attendanceError) {
+      await Promise.all([
+        loadAttendance(nextEvent.id, userId),
+        loadGallery(nextEvent.id),
+      ]);
+    } catch (experienceError) {
       setError(
-        attendanceError instanceof Error
-          ? attendanceError.message
-          : "Attendance could not be loaded.",
+        experienceError instanceof Error
+          ? experienceError.message
+          : "The event experience could not be loaded.",
       );
     }
     setLoading(false);
-  }, [eventId, loadAttendance]);
+  }, [eventId, loadAttendance, loadGallery]);
 
   useEffect(() => {
     void loadEvent();
   }, [loadEvent]);
 
-  const routeOnNoxaMap = useCallback(() => {
-    if (!event) return;
-    router.replace({
-      pathname: "/(tabs)",
-      params: {
-        focusEventId: event.id,
-        mapMode: "route",
-      },
-    });
-  }, [event]);
-
-  const toggleAttendance = useCallback(async () => {
-    if (!event || !currentUserId || isHost || busy) return;
-    setBusy(true);
-    setError(null);
-    const result = isAttending
-      ? await supabase
-          .from("event_attendees")
-          .delete()
-          .eq("event_id", event.id)
-          .eq("user_id", currentUserId)
-      : await supabase
-          .from("event_attendees")
-          .insert({ event_id: event.id, user_id: currentUserId });
-    if (result.error) setError(result.error.message);
-    else {
-      await loadAttendance(event.id, currentUserId);
-      if (!isAttending) routeOnNoxaMap();
-    }
-    setBusy(false);
-  }, [
-    busy,
-    currentUserId,
-    event,
-    isAttending,
-    isHost,
-    loadAttendance,
-    routeOnNoxaMap,
-  ]);
+  const setRsvp = useCallback(
+    async (response: EventResponse | null) => {
+      if (!event || !currentUserId || isHost || busy || rsvpClosed) return;
+      if (
+        response === "going"
+        && myResponse !== "going"
+        && event.capacity !== null
+        && goingCount >= event.capacity
+      ) {
+        setError("This event has reached its confirmed capacity.");
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      const result = response === null
+        ? await supabase
+            .from("event_attendees")
+            .delete()
+            .eq("event_id", event.id)
+            .eq("user_id", currentUserId)
+        : myResponse
+          ? await supabase
+              .from("event_attendees")
+              .update({ response })
+              .eq("event_id", event.id)
+              .eq("user_id", currentUserId)
+          : await supabase
+              .from("event_attendees")
+              .insert({ event_id: event.id, user_id: currentUserId, response });
+      if (result.error) setError(result.error.message);
+      else await loadAttendance(event.id, currentUserId);
+      setBusy(false);
+    },
+    [
+      busy,
+      currentUserId,
+      event,
+      goingCount,
+      isHost,
+      loadAttendance,
+      myResponse,
+      rsvpClosed,
+    ],
+  );
 
   const toggleSavedEvent = useCallback(async () => {
     if (!event || !currentUserId || savingEvent) return;
@@ -322,15 +389,35 @@ export default function EventDetailsScreen() {
           .from("saved_events")
           .insert({ event_id: event.id, user_id: currentUserId });
     if (result.error) setError(result.error.message);
-    else setIsSaved(!isSaved);
+    else setIsSaved((current) => !current);
     setSavingEvent(false);
   }, [currentUserId, event, isSaved, savingEvent]);
+
+  const routeOnNoxaMap = useCallback(() => {
+    if (!event) return;
+    router.replace({
+      pathname: "/(tabs)",
+      params: { focusEventId: event.id, mapMode: "route" },
+    });
+  }, [event]);
+
+  const openChat = useCallback(() => {
+    if (!event) return;
+    if (!canChat) {
+      Alert.alert(
+        "RSVP required",
+        "Choose Going or Maybe before joining the participant chat.",
+      );
+      return;
+    }
+    router.push({ pathname: "/event-chat", params: { id: event.id } });
+  }, [canChat, event]);
 
   const confirmDelete = useCallback(() => {
     if (!event || !currentUserId || deleting) return;
     Alert.alert(
       "Delete event?",
-      "This removes the event and its attendance list.",
+      "This removes the event, chat, gallery records, and attendance list.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -339,19 +426,34 @@ export default function EventDetailsScreen() {
           onPress: async () => {
             setDeleting(true);
             setError(null);
+            const { data: galleryRows, error: galleryError } = await supabase
+              .from("event_gallery_items")
+              .select("object_path")
+              .eq("event_id", event.id);
+            if (galleryError) {
+              setError(galleryError.message);
+              setDeleting(false);
+              return;
+            }
+            const galleryPaths = (galleryRows ?? []).map((row) => row.object_path);
+            if (galleryPaths.length) {
+              const { error: storageError } = await supabase.storage
+                .from(eventGalleryBucket)
+                .remove(galleryPaths);
+              if (storageError) {
+                setError(storageError.message);
+                setDeleting(false);
+                return;
+              }
+            }
             const { data, error: deleteError } = await supabase
               .from("events")
               .delete()
               .eq("id", event.id)
               .eq("creator_id", currentUserId)
               .select("id");
-            if (deleteError) {
-              setError(deleteError.message);
-              setDeleting(false);
-              return;
-            }
-            if (!data || data.length !== 1) {
-              setError("Event was not deleted.");
+            if (deleteError || !data || data.length !== 1) {
+              setError(deleteError?.message ?? "Event was not deleted.");
               setDeleting(false);
               return;
             }
@@ -364,54 +466,68 @@ export default function EventDetailsScreen() {
 
   const shareEvent = useCallback(async () => {
     if (!event || sharing) return;
-
     setSharing(true);
     try {
       const eventUrl = Linking.createURL("/event-details", {
         queryParams: { id: event.id },
       });
       await Share.share({
-        message: `${event.title}\n${formatDateTime(event.starts_at)} · ${event.location_name}\n${eventUrl}`,
         title: event.title,
+        message: `${event.title}\n${formatEventDateTime(event.starts_at)} · ${event.location_name}\n${eventUrl}`,
       });
     } catch {
-      Alert.alert("Unable to share event", "Please try again.");
+      setError("The event could not be shared.");
     } finally {
       setSharing(false);
     }
   }, [event, sharing]);
 
-  const bottomLabel = isHost ? "HOSTING" : isAttending ? "Cancel Attendance" : "Attend Event";
+  const bottomLabel = rsvpClosed
+    ? lifecycle === "completed" ? "VIEW EVENT SUMMARY" : "EVENT CANCELLED"
+    : isHost
+      ? "HOSTING"
+      : busy
+        ? "SAVING…"
+        : myResponse === "going"
+          ? "CANCEL RSVP"
+          : myResponse === "maybe"
+            ? "CONFIRM GOING"
+            : "RSVP — GOING";
+
+  const bottomAction = useCallback(() => {
+    if (!event) return;
+    if (lifecycle === "completed") {
+      router.push({ pathname: "/event-summary", params: { id: event.id } });
+      return;
+    }
+    if (rsvpClosed || isHost) return;
+    void setRsvp(myResponse === "going" ? null : "going");
+  }, [event, isHost, lifecycle, myResponse, rsvpClosed, setRsvp]);
 
   return (
     <NoxaScreen padded={false}>
       <View style={styles.header}>
-        <HeaderAction
-          icon="chevron-back"
-          label="Go back"
-          onPress={() => router.back()}
-        />
+        <HeaderAction icon="chevron-back" label="Go back" onPress={() => router.back()} />
         <View style={styles.headerActions}>
           <HeaderAction
+            disabled={!currentUserId || savingEvent}
             icon={isSaved ? "heart" : "heart-outline"}
             label={isSaved ? "Remove saved event" : "Save event"}
             onPress={() => void toggleSavedEvent()}
           />
           <HeaderAction
-            icon="refresh"
-            label="Refresh event"
-            onPress={() => void loadEvent()}
-          />
-          <HeaderAction
+            disabled={sharing}
             icon={sharing ? "checkmark" : "share-social-outline"}
             label="Share event"
             onPress={() => void shareEvent()}
           />
+          <HeaderAction icon="refresh" label="Refresh event" onPress={() => void loadEvent()} />
         </View>
       </View>
+
       <ScrollView
-        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
         {loading ? (
           <View style={styles.fullState}>
@@ -420,44 +536,34 @@ export default function EventDetailsScreen() {
           </View>
         ) : notFound ? (
           <View style={styles.fullState}>
-            <Text style={styles.stateTitle}>Event not found</Text>
-            <NoxaButton
-              title="Back to Events"
-              onPress={() => router.replace("/(tabs)/events")}
-            />
+            <Text style={styles.stateTitle}>EVENT NOT FOUND</Text>
+            <NoxaButton title="BACK TO EVENTS" onPress={() => router.replace("/(tabs)/events")} />
           </View>
         ) : event ? (
           <>
-            <View style={styles.heroCard}>
+            <View style={styles.hero}>
               {event.cover_image_url ? (
                 <Image source={{ uri: event.cover_image_url }} style={styles.heroImage} />
+              ) : gallery[0]?.signedUrl ? (
+                <Image source={{ uri: gallery[0].signedUrl }} style={styles.heroImage} />
               ) : (
                 <View style={[styles.heroImage, styles.heroPlaceholder]}>
-                  <Ionicons name="flag" size={88} color={colors.primaryMuted} />
+                  <Ionicons name="flag" size={72} color={colors.primaryMuted} />
                 </View>
               )}
               <View style={styles.heroShade} />
-              <View style={styles.heroBottomShade} />
-              <View style={styles.heroContent}>
-                <View style={styles.heroBadgeRow}>
-                  <NoxaBadge label={event.status.toUpperCase()} variant={event.status === "scheduled" ? "primary" : "default"} />
-                  <NoxaBadge label={event.is_public ? "PUBLIC" : "PRIVATE"} variant="default" />
+              <View style={styles.heroCopy}>
+                <LifecycleBadge lifecycle={lifecycle} />
+                <Text numberOfLines={2} style={styles.heroTitle}>{event.title}</Text>
+                <View style={styles.heroMetaRow}>
+                  <View style={styles.categoryBadge}>
+                    <Text style={styles.categoryText}>{event.category.toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.heroMeta}>
+                    {formatEventDate(event.starts_at)} · {formatEventTime(event.starts_at)}
+                  </Text>
                 </View>
-                <Text style={styles.heroTitle}>{event.title}</Text>
-                <Text style={styles.heroHost}>Hosted by {eventCrew?.name ?? displayName(creator)}</Text>
               </View>
-            </View>
-
-            <View style={styles.infoGrid}>
-              <EventInfoCell icon="location-outline" label="LOCATION" value={event.location_name} bottomBorder />
-              <EventInfoCell icon="calendar-outline" label="DATE" value={formatDate(event.starts_at)} leftBorder bottomBorder />
-              <EventInfoCell icon="time-outline" label="TIME" value={formatTime(event.starts_at)} />
-              <EventInfoCell
-                icon={event.is_public ? "earth-outline" : "lock-closed-outline"}
-                label="ACCESS"
-                value={event.is_public ? "Public event" : "Private event"}
-                leftBorder
-              />
             </View>
 
             <Pressable
@@ -465,132 +571,267 @@ export default function EventDetailsScreen() {
               onPress={() =>
                 eventCrew
                   ? router.push({ pathname: "/crew/[id]", params: { id: eventCrew.id } })
-                  : router.push({
-                      pathname: "/driver-profile/[id]",
-                      params: { id: event.creator_id },
-                    })
+                  : router.push({ pathname: "/driver-profile/[id]", params: { id: event.creator_id } })
               }
-              style={({ pressed }) => [
-                styles.cardCompact,
-                pressed && styles.pressed,
-              ]}
+              style={({ pressed }) => [styles.organizerCard, pressed && styles.pressed]}
             >
-              {(eventCrew?.logo_url || creator?.avatar_url) ? (
+              {eventCrew?.logo_url || creator?.avatar_url ? (
                 <Image
                   source={{ uri: eventCrew?.logo_url ?? creator?.avatar_url ?? "" }}
-                  style={styles.hostAvatar}
+                  style={styles.organizerAvatar}
                 />
               ) : (
-                <View style={styles.hostAvatarFallback}>
-                  <Ionicons name={eventCrew ? "people" : "person"} size={24} color={colors.text} />
+                <View style={[styles.organizerAvatar, styles.avatarFallback]}>
+                  <Text style={styles.organizerInitials}>
+                    {initials(eventCrew?.name ?? displayName(creator))}
+                  </Text>
                 </View>
               )}
-              <View style={styles.hostCopy}>
-                <Text style={styles.eyebrow}>{eventCrew ? "Host crew" : "Host"}</Text>
-                <Text style={styles.hostName}>{eventCrew?.name ?? displayName(creator)}</Text>
-                <Text style={styles.mutedText}>
+              <View style={styles.organizerCopy}>
+                <Text style={styles.miniLabel}>ORGANIZED BY</Text>
+                <Text numberOfLines={1} style={styles.organizerName}>
+                  {eventCrew?.name ?? displayName(creator)}
+                </Text>
+                <Text style={styles.organizerMeta}>
                   {eventCrew?.city ?? creator?.city ?? "NOXA community"}
                 </Text>
               </View>
-              <Ionicons
-                name={eventCrew ? "people" : "shield-checkmark"}
-                size={22}
-                color={colors.primary}
-              />
+              <View style={styles.viewChip}>
+                <Text style={styles.viewChipText}>VIEW</Text>
+              </View>
             </Pressable>
 
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>ATTENDING</Text>
-                <View style={styles.attendancePill}>
-                  <Ionicons name="people" size={14} color={colors.primaryHover} />
-                  <Text style={styles.attendancePillText}>{attendeeCount} GOING</Text>
-                </View>
+            <View style={styles.rsvpCard}>
+              <View style={styles.segmented}>
+                {([
+                  { value: "going" as const, label: "Going" },
+                  { value: "maybe" as const, label: "Maybe" },
+                  { value: null, label: "Can't" },
+                ]).map((option, index) => {
+                  const active = isHost
+                    ? option.value === "going"
+                    : myResponse === option.value;
+                  return (
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: active, disabled: isHost || rsvpClosed }}
+                      disabled={isHost || rsvpClosed || busy}
+                      key={option.label}
+                      onPress={() => void setRsvp(option.value)}
+                      style={({ pressed }) => [
+                        styles.segment,
+                        index === 0 && styles.segmentFirst,
+                        index === 2 && styles.segmentLast,
+                        active && styles.segmentActive,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-              <Text style={styles.description}>
-                {isHost
-                  ? "You are hosting this event."
-                  : isAttending
-                    ? "You are on the attendance list."
-                    : "Join when you plan to attend."}
-              </Text>
+              <View style={styles.capacityRow}>
+                <View>
+                  <Text style={styles.capacityValue}>
+                    {goingCount}{event.capacity ? ` / ${event.capacity}` : ""}
+                  </Text>
+                  <Text style={styles.capacityLabel}>CONFIRMED</Text>
+                </View>
+                <Text style={styles.maybeText}>{maybeCount} MAYBE</Text>
+              </View>
+              {event.capacity ? (
+                <View style={styles.capacityTrack}>
+                  <View style={[styles.capacityFill, { width: `${capacityProgress * 100}%` }]} />
+                </View>
+              ) : null}
+              <View style={styles.attendanceFooter}>
+                <View style={styles.avatarStack}>
+                  {attendees.map((attendee, index) =>
+                    attendee.avatar_url ? (
+                      <Image
+                        key={attendee.id}
+                        source={{ uri: attendee.avatar_url }}
+                        style={[styles.stackAvatar, index > 0 && styles.stackAvatarOverlap]}
+                      />
+                    ) : (
+                      <View
+                        key={attendee.id}
+                        style={[
+                          styles.stackAvatar,
+                          styles.avatarFallback,
+                          index > 0 && styles.stackAvatarOverlap,
+                        ]}
+                      >
+                        <Text style={styles.stackInitials}>{initials(displayName(attendee))}</Text>
+                      </View>
+                    ),
+                  )}
+                </View>
+                <Text style={styles.spotsText}>
+                  {event.capacity
+                    ? `${Math.max(0, event.capacity - goingCount)} spots left`
+                    : "Open capacity"}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.meetingCard}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleRow}>
+                  <Ionicons name="location" size={15} color={colors.textMuted} />
+                  <Text style={styles.sectionTitle}>MEETING POINT</Text>
+                </View>
+                {canChat ? (
+                  <Pressable onPress={routeOnNoxaMap}>
+                    <Text style={styles.sectionAction}>ROUTE</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <Text style={styles.meetingName}>{event.location_name}</Text>
+              <Text style={styles.meetingTime}>Meet by {formatEventTime(event.starts_at)}</Text>
+              {event.latitude !== null && event.longitude !== null ? (
+                <Pressable
+                  accessibilityLabel="Open route on NOXA map"
+                  onPress={routeOnNoxaMap}
+                  style={({ pressed }) => [styles.mapPreview, pressed && styles.pressed]}
+                >
+                  <MapView
+                    initialRegion={{
+                      latitude: event.latitude,
+                      longitude: event.longitude,
+                      latitudeDelta: 0.025,
+                      longitudeDelta: 0.025,
+                    }}
+                    pitchEnabled={false}
+                    pointerEvents="none"
+                    provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+                    rotateEnabled={false}
+                    scrollEnabled={false}
+                    style={StyleSheet.absoluteFill}
+                    toolbarEnabled={false}
+                    zoomEnabled={false}
+                  >
+                    <Marker coordinate={{ latitude: event.latitude, longitude: event.longitude }} />
+                  </MapView>
+                  <View style={styles.mapShade} />
+                  <View style={styles.mapRouteBadge}>
+                    <Ionicons name="navigate" size={14} color={colors.text} />
+                    <Text style={styles.mapRouteText}>OPEN NOXA ROUTE</Text>
+                  </View>
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={routeOnNoxaMap}
+                  style={({ pressed }) => [styles.mapEmpty, pressed && styles.pressed]}
+                >
+                  <Ionicons name="map-outline" size={21} color={colors.textSubtle} />
+                  <Text style={styles.mapEmptyText}>Open event on NOXA Map</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <View style={styles.gallerySection}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>GALLERY · {galleryCount} PHOTOS</Text>
+                <Pressable
+                  onPress={() => router.push({ pathname: "/event-gallery", params: { id: event.id } })}
+                >
+                  <Text style={styles.sectionAction}>SEE ALL</Text>
+                </Pressable>
+              </View>
+              {gallery.length ? (
+                <View style={styles.galleryPreview}>
+                  {gallery.map((item, index) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => router.push({ pathname: "/event-gallery", params: { id: event.id } })}
+                      style={({ pressed }) => [
+                        styles.galleryTile,
+                        index === 0 && styles.galleryTileLead,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Image source={{ uri: item.signedUrl }} style={styles.galleryImage} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => router.push({ pathname: "/event-gallery", params: { id: event.id } })}
+                  style={({ pressed }) => [styles.galleryEmpty, pressed && styles.pressed]}
+                >
+                  <Ionicons name="images-outline" size={25} color={colors.primaryHover} />
+                  <View style={styles.galleryEmptyCopy}>
+                    <Text style={styles.galleryEmptyTitle}>START THE EVENT GALLERY</Text>
+                    <Text style={styles.galleryEmptyText}>
+                      {canChat ? "Add the first participant photo." : "RSVP to contribute photos."}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={17} color={colors.textSubtle} />
+                </Pressable>
+              )}
             </View>
 
             {event.description ? (
               <View style={styles.aboutSection}>
-                <Text style={styles.sectionEyebrow}>ABOUT</Text>
+                <Text style={styles.sectionTitle}>ABOUT</Text>
                 <Text style={styles.aboutText}>{event.description}</Text>
               </View>
             ) : null}
 
-            {attendees.length > 0 ? (
-              <View style={styles.attendeesSection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionEyebrow}>WHO&apos;S GOING</Text>
-                  {attendeeCount > attendees.length ? <Text style={styles.sectionMeta}>+{attendeeCount - attendees.length} MORE</Text> : null}
+            {eventCrew ? (
+              <Pressable
+                onPress={() => router.push({ pathname: "/crew/[id]", params: { id: eventCrew.id } })}
+                style={({ pressed }) => [styles.crewCard, pressed && styles.pressed]}
+              >
+                {eventCrew.cover_image_url || eventCrew.logo_url ? (
+                  <Image
+                    source={{ uri: eventCrew.cover_image_url ?? eventCrew.logo_url ?? "" }}
+                    style={styles.crewImage}
+                  />
+                ) : (
+                  <View style={[styles.crewImage, styles.crewPlaceholder]}>
+                    <Ionicons name="people" size={26} color={colors.primaryHover} />
+                  </View>
+                )}
+                <View style={styles.crewCopy}>
+                  <Text style={styles.miniLabel}>CREW</Text>
+                  <Text style={styles.crewName}>{eventCrew.name}</Text>
+                  <Text style={styles.crewMeta}>{eventCrew.city ?? "NOXA crew event"}</Text>
                 </View>
-                <View style={styles.attendeeList}>
-                  {attendees.map((attendee, index) => (
-                    <Pressable
-                      key={attendee.id}
-                      accessibilityRole="button"
-                      onPress={() => router.push({ pathname: "/driver-profile/[id]", params: { id: attendee.id } })}
-                      style={({ pressed }) => [styles.attendeeRow, index < attendees.length - 1 && styles.attendeeRowBorder, pressed && styles.pressed]}>
-                      {attendee.avatar_url ? (
-                        <Image source={{ uri: attendee.avatar_url }} style={styles.attendeeAvatar} />
-                      ) : (
-                        <View style={[styles.attendeeAvatar, styles.attendeeAvatarFallback]}>
-                          <Ionicons name="person" size={18} color={colors.text} />
-                        </View>
-                      )}
-                      <View style={styles.attendeeCopy}>
-                        <Text style={styles.attendeeName}>{displayName(attendee)}</Text>
-                        <Text style={styles.attendeeHandle}>{profileHandle(attendee)}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textSubtle} />
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textSubtle} />
+              </Pressable>
             ) : null}
 
-            {isAttending && !isHost ? (
-              <View style={styles.sectionCard}>
-                <Text style={styles.sectionTitle}>NOXA ROUTE</Text>
-                <Text style={styles.description}>
-                  Open a private in-app route from your current position to this
-                  event.
+            {lifecycle === "completed" ? (
+              <View style={styles.completedCard}>
+                <View style={styles.completedIcon}>
+                  <Ionicons name="checkmark" size={22} color={colors.success} />
+                </View>
+                <Text style={styles.completedTitle}>EVENT COMPLETED</Text>
+                <Text style={styles.completedText}>
+                  View the real attendance, gallery highlights, vehicles, and duration.
                 </Text>
                 <NoxaButton
-                  title="Route on NOXA Map"
-                  variant="secondary"
-                  onPress={routeOnNoxaMap}
+                  title="VIEW EVENT SUMMARY"
+                  onPress={() => router.push({ pathname: "/event-summary", params: { id: event.id } })}
                 />
-              </View>
-            ) : null}
-
-            {event.ends_at ? (
-              <View style={styles.endNote}>
-                <Ionicons name="time-outline" size={16} color={colors.textMuted} />
-                <Text style={styles.endNoteText}>Ends {formatDateTime(event.ends_at)}</Text>
               </View>
             ) : null}
 
             {isHost ? (
-              <View style={styles.sectionCard}>
+              <View style={styles.hostControls}>
                 <Text style={styles.sectionTitle}>ORGANIZER CONTROLS</Text>
                 <NoxaButton
-                  title="Edit Event"
+                  title="EDIT EVENT"
                   variant="secondary"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/event-editor",
-                      params: { id: event.id },
-                    })
-                  }
+                  onPress={() => router.push({ pathname: "/event-editor", params: { id: event.id } })}
                 />
                 <NoxaButton
-                  title="Delete Event"
+                  title="DELETE EVENT"
                   variant="danger"
                   loading={deleting}
                   onPress={confirmDelete}
@@ -599,32 +840,44 @@ export default function EventDetailsScreen() {
             ) : null}
           </>
         ) : null}
+
         {error ? (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
-            <NoxaButton
-              title="Retry"
-              variant="secondary"
-              onPress={() => void loadEvent()}
-            />
+            <Pressable onPress={() => setError(null)}>
+              <Ionicons name="close" size={18} color={colors.textMuted} />
+            </Pressable>
           </View>
         ) : null}
       </ScrollView>
+
       {event && !loading && !notFound ? (
         <View style={styles.bottomBar}>
           <Pressable
+            accessibilityLabel="Open event chat"
             accessibilityRole="button"
-            disabled={isHost || busy || !currentUserId}
-            onPress={toggleAttendance}
+            onPress={openChat}
+            style={({ pressed }) => [styles.chatButton, pressed && styles.pressed]}
+          >
+            <Ionicons
+              name="chatbubble-outline"
+              size={17}
+              color={canChat ? colors.text : colors.textMuted}
+            />
+            <Text style={[styles.chatText, !canChat && styles.chatTextMuted]}>CHAT</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={(isHost || lifecycle === "cancelled" || busy) && lifecycle !== "completed"}
+            onPress={bottomAction}
             style={({ pressed }) => [
-              styles.joinButton,
-              (isHost || isAttending) && styles.joinedButton,
-              pressed && !isHost && styles.pressed,
+              styles.primaryFooterButton,
+              (isHost || myResponse === "going" || lifecycle === "cancelled") && styles.footerButtonSecondary,
+              lifecycle === "completed" && styles.primaryFooterButton,
+              pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.joinText}>
-              {busy ? "Saving…" : bottomLabel}
-            </Text>
+            <Text style={styles.footerButtonText}>{bottomLabel}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -635,13 +888,15 @@ export default function EventDetailsScreen() {
 const styles = StyleSheet.create({
   header: {
     position: "absolute",
-    top: spacing.lg,
-    left: spacing.lg,
-    right: spacing.lg,
-    zIndex: 10,
+    top: spacing.sm,
+    left: spacing.sm,
+    right: spacing.sm,
+    zIndex: 20,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
   },
+  headerActions: { flexDirection: "row", gap: spacing.xs },
   headerAction: {
     width: 38,
     height: 38,
@@ -649,248 +904,252 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(6,6,10,0.76)",
+    borderColor: "rgba(255,255,255,0.17)",
+    backgroundColor: "rgba(0,0,0,0.58)",
   },
-  headerActions: { flexDirection: "row", gap: spacing.xs },
-  pressed: { opacity: 0.86, transform: [{ translateY: 1 }, { scale: 0.98 }] },
-  content: { paddingBottom: 132, gap: spacing.md },
-  heroCard: {
-    height: 300,
-    overflow: "hidden",
-    backgroundColor: colors.surface,
-  },
+  content: { paddingBottom: 126, gap: spacing.md },
+  hero: { height: 255, overflow: "hidden", backgroundColor: colors.surface },
   heroImage: { width: "100%", height: "100%" },
   heroPlaceholder: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSoft },
-  heroShade: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.28)",
-  },
-  heroBottomShade: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 190,
-    backgroundColor: "rgba(6,6,10,0.68)",
-  },
-  heroContent: {
-    position: "absolute",
-    left: spacing.lg,
-    right: spacing.lg,
-    bottom: spacing.xl,
-    gap: spacing.xs,
-  },
+  heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.46)" },
+  heroCopy: { position: "absolute", left: spacing.md, right: spacing.md, bottom: spacing.md, gap: spacing.xs },
   heroTitle: {
     color: colors.text,
     fontFamily: typography.fontFamily.display,
-    fontSize: 34,
+    fontSize: 29,
     fontWeight: "900",
-    letterSpacing: 0.4,
-    lineHeight: 37,
+    lineHeight: 31,
     textTransform: "uppercase",
   },
-  heroBadgeRow: { flexDirection: "row", gap: spacing.xs },
-  heroHost: { color: "rgba(240,240,244,0.58)", fontSize: typography.caption, fontWeight: "700" },
-  infoGrid: {
-    marginHorizontal: spacing.lg,
+  heroMetaRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  heroMeta: { flex: 1, color: "rgba(255,255,255,0.58)", fontSize: 11, fontWeight: "700" },
+  categoryBadge: { paddingVertical: 4, paddingHorizontal: spacing.xs, borderRadius: radius.pill, backgroundColor: colors.primary },
+  categoryText: { color: colors.text, fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
+  lifecycleBadge: {
+    alignSelf: "flex-start",
     flexDirection: "row",
-    flexWrap: "wrap",
-    overflow: "hidden",
-    borderRadius: radius.lg,
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primaryMuted,
   },
-  infoCell: { width: "50%", minHeight: 112, padding: spacing.md, justifyContent: "center" },
-  infoCellLeftBorder: { borderLeftWidth: 1, borderLeftColor: colors.divider },
-  infoCellBottomBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
-  infoIcon: {
-    width: 30,
-    height: 30,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.xs,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primarySubtle,
-  },
-  infoLabel: { color: colors.textSubtle, fontSize: 9, fontWeight: "900", letterSpacing: 1.1 },
-  infoValue: { marginTop: spacing.xxs, color: colors.text, fontSize: typography.caption, fontWeight: "800", lineHeight: 17 },
-  cardCompact: {
-    marginHorizontal: spacing.lg,
+  lifecycleBadgeComplete: { borderColor: "rgba(48,209,88,0.3)", backgroundColor: colors.successMuted },
+  lifecycleBadgeSoon: { borderColor: "rgba(255,159,10,0.3)", backgroundColor: colors.warningMuted },
+  lifecycleBadgeNeutral: { borderColor: colors.borderStrong, backgroundColor: "rgba(24,24,29,0.78)" },
+  lifecycleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primaryHover },
+  lifecycleDotComplete: { backgroundColor: colors.success },
+  lifecycleDotSoon: { backgroundColor: colors.warning },
+  lifecycleDotNeutral: { backgroundColor: colors.textMuted },
+  lifecycleText: { color: colors.primaryHover, fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
+  lifecycleTextComplete: { color: colors.success },
+  lifecycleTextSoon: { color: colors.warning },
+  lifecycleTextNeutral: { color: colors.textMuted },
+  organizerCard: {
+    marginHorizontal: spacing.md,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: spacing.sm,
+    padding: spacing.sm,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     ...shadows.card,
   },
-  hostAvatar: {
-    width: 58,
-    height: 58,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.72)",
-  },
-  hostAvatarFallback: {
-    width: 58,
-    height: 58,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSoft,
-  },
-  hostCopy: { flex: 1 },
-  eyebrow: {
-    color: colors.primary,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-    textTransform: "uppercase",
-  },
-  hostName: {
-    marginTop: 2,
-    color: colors.text,
-    fontSize: typography.cardTitle,
-    fontWeight: "900",
-  },
-  mutedText: {
-    marginTop: 2,
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "700",
-  },
-  sectionCard: {
-    marginHorizontal: spacing.lg,
-    gap: spacing.md,
-    padding: spacing.lg,
+  organizerAvatar: { width: 44, height: 44, borderRadius: radius.md },
+  avatarFallback: { alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceSoft },
+  organizerInitials: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  organizerCopy: { flex: 1 },
+  miniLabel: { color: colors.textMuted, fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
+  organizerName: { marginTop: 2, color: colors.text, fontSize: 14, fontWeight: "900" },
+  organizerMeta: { marginTop: 2, color: colors.textMuted, fontSize: 10, fontWeight: "600" },
+  viewChip: { paddingVertical: 6, paddingHorizontal: spacing.xs, borderRadius: radius.md, backgroundColor: colors.surfaceSoft },
+  viewChipText: { color: colors.textMuted, fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
+  rsvpCard: {
+    marginHorizontal: spacing.md,
+    gap: spacing.sm,
+    padding: spacing.md,
     borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  sectionHeader: {
+  segmented: { flexDirection: "row" },
+  segment: {
+    flex: 1,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surfaceSoft,
+    borderRightWidth: 1,
+    borderRightColor: colors.background,
+  },
+  segmentFirst: { borderTopLeftRadius: radius.md, borderBottomLeftRadius: radius.md },
+  segmentLast: { borderTopRightRadius: radius.md, borderBottomRightRadius: radius.md, borderRightWidth: 0 },
+  segmentActive: { backgroundColor: colors.primary },
+  segmentText: { color: colors.textMuted, fontSize: 12, fontWeight: "700" },
+  segmentTextActive: { color: colors.text, fontWeight: "900" },
+  capacityRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  capacityValue: { color: colors.text, fontSize: 20, fontWeight: "900" },
+  capacityLabel: { marginTop: 1, color: colors.textSubtle, fontSize: 8, fontWeight: "900", letterSpacing: 0.8 },
+  maybeText: { color: colors.textMuted, fontSize: 9, fontWeight: "900", letterSpacing: 0.6 },
+  capacityTrack: { height: 5, overflow: "hidden", borderRadius: radius.pill, backgroundColor: colors.surfaceRaised },
+  capacityFill: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.primary },
+  attendanceFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  avatarStack: { minHeight: 28, flexDirection: "row", alignItems: "center" },
+  stackAvatar: { width: 28, height: 28, borderRadius: radius.pill, borderWidth: 2, borderColor: colors.surface },
+  stackAvatarOverlap: { marginLeft: -7 },
+  stackInitials: { color: colors.text, fontSize: 7, fontWeight: "900" },
+  spotsText: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
+  meetingCard: {
+    marginHorizontal: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
+  sectionTitle: { color: colors.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: 1.1 },
+  sectionAction: { color: colors.primaryHover, fontSize: 10, fontWeight: "900", letterSpacing: 0.6 },
+  meetingName: { marginTop: spacing.sm, color: colors.text, fontSize: 14, fontWeight: "900" },
+  meetingTime: { marginTop: 3, color: colors.textMuted, fontSize: 11, fontWeight: "700" },
+  mapPreview: { height: 96, overflow: "hidden", marginTop: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surfaceSoft },
+  mapShade: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.18)" },
+  mapRouteBadge: {
+    position: "absolute",
+    right: spacing.xs,
+    bottom: spacing.xs,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
+    gap: spacing.xxs,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(0,0,0,0.76)",
   },
-  sectionTitle: {
-    color: colors.text,
-    fontFamily: typography.fontFamily.display,
-    fontSize: typography.title,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-  },
-  sectionMeta: {
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "800",
-  },
-  description: {
-    color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: "600",
-    lineHeight: 24,
-  },
-  attendancePill: {
-    minHeight: 30,
+  mapRouteText: { color: colors.text, fontSize: 8, fontWeight: "900", letterSpacing: 0.5 },
+  mapEmpty: { height: 82, alignItems: "center", justifyContent: "center", gap: spacing.xxs, marginTop: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surfaceSoft },
+  mapEmptyText: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
+  gallerySection: { marginHorizontal: spacing.md, gap: spacing.sm },
+  galleryPreview: { height: 92, flexDirection: "row", gap: spacing.xs },
+  galleryTile: { flex: 1, overflow: "hidden", borderRadius: radius.md, backgroundColor: colors.surfaceSoft },
+  galleryTileLead: { flex: 2 },
+  galleryImage: { width: "100%", height: "100%" },
+  galleryEmpty: {
+    minHeight: 82,
     flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  galleryEmptyCopy: { flex: 1 },
+  galleryEmptyTitle: { color: colors.text, fontSize: 11, fontWeight: "900" },
+  galleryEmptyText: { marginTop: 3, color: colors.textMuted, fontSize: 10, fontWeight: "600" },
+  aboutSection: { marginHorizontal: spacing.md, gap: spacing.xs },
+  aboutText: { color: colors.text, fontSize: 14, lineHeight: 21, fontWeight: "600" },
+  crewCard: {
+    marginHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  crewImage: { width: 46, height: 46, borderRadius: radius.md },
+  crewPlaceholder: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSoft },
+  crewCopy: { flex: 1 },
+  crewName: { marginTop: 2, color: colors.text, fontSize: 13, fontWeight: "900" },
+  crewMeta: { marginTop: 2, color: colors.textMuted, fontSize: 10, fontWeight: "600" },
+  completedCard: {
+    marginHorizontal: spacing.md,
     alignItems: "center",
     gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.pill,
-    backgroundColor: colors.primarySubtle,
+    padding: spacing.lg,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: colors.borderAccent,
+    borderColor: "rgba(48,209,88,0.25)",
+    backgroundColor: colors.successMuted,
   },
-  attendancePillText: { color: colors.primaryHover, fontSize: 9, fontWeight: "900", letterSpacing: 0.7 },
-  aboutSection: { marginHorizontal: spacing.lg, gap: spacing.sm, paddingVertical: spacing.xs },
-  sectionEyebrow: { color: colors.textMuted, fontSize: 10, fontWeight: "900", letterSpacing: typography.letterSpacing.label },
-  aboutText: { color: colors.text, fontSize: 14, fontWeight: "600", lineHeight: 23 },
-  attendeesSection: { marginHorizontal: spacing.lg, gap: spacing.sm },
-  attendeeList: {
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
+  completedIcon: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: radius.pill, backgroundColor: "rgba(48,209,88,0.12)" },
+  completedTitle: { color: colors.success, fontSize: 13, fontWeight: "900", letterSpacing: 0.7 },
+  completedText: { marginBottom: spacing.xs, color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
+  hostControls: {
+    marginHorizontal: spacing.md,
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  attendeeRow: { minHeight: 64, flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  attendeeRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
-  attendeeAvatar: { width: 40, height: 40, borderRadius: radius.pill },
-  attendeeAvatarFallback: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceSoft },
-  attendeeCopy: { flex: 1 },
-  attendeeName: { color: colors.text, fontSize: 14, fontWeight: "800" },
-  attendeeHandle: { marginTop: 2, color: colors.textMuted, fontSize: typography.caption, fontWeight: "600" },
-  endNote: { marginHorizontal: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  endNoteText: { color: colors.textMuted, fontSize: typography.caption, fontWeight: "700" },
-  fullState: {
-    minHeight: 420,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.md,
-    padding: spacing.xl,
-  },
-  stateTitle: {
-    color: colors.text,
-    fontSize: typography.sectionTitle,
-    fontWeight: "900",
-  },
-  stateText: {
-    color: colors.textMuted,
-    fontSize: typography.body,
-    fontWeight: "700",
-  },
   errorCard: {
-    marginHorizontal: spacing.lg,
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.card,
+    marginHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderAccent,
-    backgroundColor: colors.primaryMuted,
+    backgroundColor: colors.primarySubtle,
   },
-  errorText: {
-    color: colors.text,
-    fontSize: typography.caption,
-    fontWeight: "800",
-  },
+  errorText: { flex: 1, color: colors.primaryHover, fontSize: 11, fontWeight: "700" },
   bottomBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
+    flexDirection: "row",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: "rgba(6,6,10,0.96)",
+    borderTopColor: colors.divider,
+    backgroundColor: colors.glass,
   },
-  joinButton: {
-    height: 54,
+  chatButton: {
+    minWidth: 96,
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.button,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  chatText: { color: colors.text, fontSize: 11, fontWeight: "900", letterSpacing: 0.5 },
+  chatTextMuted: { color: colors.textMuted },
+  primaryFooterButton: {
+    flex: 1,
+    height: 48,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.button,
     backgroundColor: colors.primary,
     ...shadows.redGlow,
   },
-  joinedButton: {
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    shadowOpacity: 0,
-  },
-  joinText: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
+  footerButtonSecondary: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceSoft, shadowOpacity: 0 },
+  footerButtonText: { color: colors.text, fontSize: 12, fontWeight: "900", letterSpacing: 0.4 },
+  fullState: { minHeight: 520, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl },
+  stateTitle: { color: colors.text, fontFamily: typography.fontFamily.display, fontSize: typography.title, fontWeight: "900" },
+  stateText: { color: colors.textMuted, fontSize: 13, fontWeight: "700" },
+  pressed: { opacity: 0.86, transform: [{ translateY: 1 }, { scale: 0.985 }] },
+  disabled: { opacity: 0.45 },
 });

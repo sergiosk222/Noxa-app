@@ -33,6 +33,8 @@ import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 type EventForm = {
   title: string;
   description: string;
+  category: EventCategory;
+  capacity: string;
   locationName: string;
   startAt: Date;
   endAt: Date | null;
@@ -41,11 +43,14 @@ type EventForm = {
   latitude: number | null;
   longitude: number | null;
 };
+type EventCategory = "meet" | "drive" | "track" | "social";
 type EventRow = {
   id: string;
   creator_id: string;
   title: string;
   description: string | null;
+  category: EventCategory;
+  capacity: number | null;
   location_name: string;
   starts_at: string;
   ends_at: string | null;
@@ -60,6 +65,12 @@ type ManagedCrew = { id: string; name: string; logo_url: string | null };
 
 const THESSALONIKI = { latitude: 40.6401, longitude: 22.9444 };
 const MAP_DELTA = { latitudeDelta: 0.035, longitudeDelta: 0.035 };
+const eventCategories: { value: EventCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: "meet", label: "MEET", icon: "people-outline" },
+  { value: "drive", label: "DRIVE", icon: "navigate-outline" },
+  { value: "track", label: "TRACK", icon: "speedometer-outline" },
+  { value: "social", label: "SOCIAL", icon: "cafe-outline" },
+];
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -73,6 +84,8 @@ function futureStart() {
 const initialForm: EventForm = {
   title: "",
   description: "",
+  category: "meet",
+  capacity: "",
   locationName: "",
   startAt: futureStart(),
   endAt: null,
@@ -147,6 +160,8 @@ function prefillFromEvent(event: EventRow): EventForm {
   return {
     title: event.title,
     description: event.description ?? "",
+    category: event.category ?? "meet",
+    capacity: event.capacity?.toString() ?? "",
     locationName: event.location_name,
     startAt: isValidDate(start) ? start : futureStart(),
     endAt: isValidDate(end) ? end : null,
@@ -251,7 +266,7 @@ export default function EventEditorScreen() {
     const { data, error: eventError } = await supabase
       .from("events")
       .select(
-        "id,creator_id,title,description,location_name,starts_at,ends_at,is_public,crew_id,latitude,longitude",
+        "id,creator_id,title,description,category,capacity,location_name,starts_at,ends_at,is_public,crew_id,latitude,longitude",
       )
       .eq("id", eventId)
       .maybeSingle();
@@ -422,6 +437,13 @@ export default function EventEditorScreen() {
     if (titleValue.length > 100) return "Title must be 100 characters or less.";
     if (form.description.length > 2000)
       return "Description must be 2000 characters or less.";
+    const capacityValue = form.capacity.trim();
+    const capacity = capacityValue ? Number(capacityValue) : null;
+    if (
+      capacityValue
+      && (capacity === null || !Number.isInteger(capacity) || capacity < 2 || capacity > 5000)
+    )
+      return "Capacity must be a whole number between 2 and 5000.";
     if (!coordinatesAttached || !locationValue)
       return "Choose the exact event location on the map.";
     if (locationValue.length > 160)
@@ -441,6 +463,7 @@ export default function EventEditorScreen() {
       location: locationValue,
       start: form.startAt,
       end: form.endAt,
+      capacity,
     };
   }, [coordinatesAttached, form, isEditing]);
 
@@ -463,6 +486,8 @@ export default function EventEditorScreen() {
     const payload = {
       title: valid.title,
       description: form.description.trim() || null,
+      category: form.category,
+      capacity: valid.capacity,
       location_name: valid.location,
       starts_at: valid.start.toISOString(),
       ends_at: valid.end?.toISOString() ?? null,
@@ -528,7 +553,7 @@ export default function EventEditorScreen() {
             <View style={styles.previewTopline}>
               <View style={styles.previewBadge}>
                 <Ionicons name="flag" size={14} color={colors.primaryHover} />
-                <Text style={styles.previewBadgeText}>COMMUNITY EVENT</Text>
+                <Text style={styles.previewBadgeText}>{form.category.toUpperCase()}</Text>
               </View>
               <Text style={styles.previewStatus}>
                 {form.isPublic ? "PUBLIC" : "PRIVATE"}
@@ -607,6 +632,41 @@ export default function EventEditorScreen() {
             <Text style={styles.characterCount}>
               {form.description.length} / 2000
             </Text>
+            <View style={styles.categoryGrid}>
+              {eventCategories.map((category) => {
+                const active = form.category === category.value;
+                return (
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: active }}
+                    key={category.value}
+                    onPress={() => updateField("category", category.value)}
+                    style={({ pressed }) => [
+                      styles.categoryOption,
+                      active && styles.categoryOptionActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Ionicons
+                      name={category.icon}
+                      size={17}
+                      color={active ? colors.primaryHover : colors.textMuted}
+                    />
+                    <Text style={[styles.categoryText, active && styles.categoryTextActive]}>
+                      {category.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <NoxaInput
+              label="Capacity (optional)"
+              value={form.capacity}
+              onChangeText={(value) => updateField("capacity", value.replace(/[^0-9]/g, ""))}
+              placeholder="60"
+              keyboardType="number-pad"
+              maxLength={4}
+            />
           </View>
 
           <View style={styles.sectionCard}>
@@ -1134,6 +1194,36 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     fontWeight: "700",
   },
+  categoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  categoryOption: {
+    minHeight: 42,
+    flexBasis: "47%",
+    flexGrow: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  categoryOptionActive: {
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primarySubtle,
+  },
+  categoryText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.8,
+  },
+  categoryTextActive: { color: colors.text },
   pickerRow: {
     flex: 1,
     gap: spacing.xs,
