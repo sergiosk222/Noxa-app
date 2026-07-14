@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
@@ -23,7 +24,6 @@ import MapView, {
 
 import {
   NoxaButton,
-  NoxaHeader,
   NoxaInput,
   NoxaScreen,
 } from "@/src/components/ui";
@@ -465,11 +465,74 @@ export default function EventEditorScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
       >
+        <View style={styles.editorHeader}>
+          <Pressable
+            accessibilityLabel="Go back"
+            accessibilityRole="button"
+            onPress={() => router.back()}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{title}</Text>
+          <View style={styles.headerSpacer} />
+        </View>
         <ScrollView
           contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <NoxaHeader title={title} subtitle="Real NOXA community events" />
+          <View style={styles.previewCard}>
+            <View style={styles.previewGlow} />
+            <View style={styles.previewTopline}>
+              <View style={styles.previewBadge}>
+                <Ionicons name="flag" size={14} color={colors.primaryHover} />
+                <Text style={styles.previewBadgeText}>COMMUNITY EVENT</Text>
+              </View>
+              <Text style={styles.previewStatus}>
+                {form.isPublic ? "PUBLIC" : "PRIVATE"}
+              </Text>
+            </View>
+            <Text numberOfLines={2} style={styles.previewTitle}>
+              {form.title.trim() || "YOUR NEXT NOXA EVENT"}
+            </Text>
+            <View style={styles.previewMeta}>
+              <View style={styles.previewMetaItem}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={15}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.previewMetaText}>
+                  {dateFormatter.format(form.startAt)}
+                </Text>
+              </View>
+              <View style={styles.previewMetaItem}>
+                <Ionicons
+                  name="time-outline"
+                  size={15}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.previewMetaText}>
+                  {timeFormatter.format(form.startAt)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.previewLocation}>
+              <Ionicons
+                name="location-outline"
+                size={15}
+                color={colors.primaryHover}
+              />
+              <Text numberOfLines={1} style={styles.previewLocationText}>
+                {form.locationName || "Choose an exact location"}
+              </Text>
+            </View>
+          </View>
+
           {loading ? (
             <View style={styles.stateCard}>
               <ActivityIndicator color={colors.primary} />
@@ -481,38 +544,68 @@ export default function EventEditorScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-          <View style={styles.formCard}>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.eyebrow}>01 / DETAILS</Text>
+              <Text style={styles.sectionTitle}>Make it unmistakable</Text>
+            </View>
             <NoxaInput
               label="Title"
               value={form.title}
               onChangeText={(value) => updateField("title", value)}
+              placeholder="Night Drive Thessaloniki"
               maxLength={100}
             />
             <NoxaInput
-              label="Description"
+              label="About"
               value={form.description}
               onChangeText={(value) => updateField("description", value)}
+              placeholder="Route, meeting point and what drivers should know…"
               multiline
               maxLength={2000}
               style={styles.textArea}
             />
+            <Text style={styles.characterCount}>
+              {form.description.length} / 2000
+            </Text>
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.eyebrow}>02 / LOCATION</Text>
+              <Text style={styles.sectionTitle}>Pin the meeting point</Text>
+            </View>
             <View style={styles.readOnlyLocation}>
-              <Text style={styles.pickerLabel}>Location</Text>
-              <Text style={styles.locationValue}>
-                {form.locationName || "No exact location selected"}
-              </Text>
+              <View style={styles.locationIcon}>
+                <Ionicons
+                  name="location"
+                  size={20}
+                  color={colors.primaryHover}
+                />
+              </View>
+              <View style={styles.locationCopy}>
+                <Text style={styles.pickerLabel}>LOCATION</Text>
+                <Text numberOfLines={2} style={styles.locationValue}>
+                  {form.locationName || "No exact location selected"}
+                </Text>
+              </View>
             </View>
             <View style={styles.locationButtons}>
               <Pressable
+                accessibilityRole="button"
                 onPress={openMapSelector}
                 style={({ pressed }) => [
                   styles.locationAction,
+                  styles.locationActionPrimary,
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={styles.locationActionText}>Choose on Map</Text>
+                <Ionicons name="map-outline" size={17} color={colors.text} />
+                <Text style={styles.locationActionText}>CHOOSE ON MAP</Text>
               </Pressable>
               <Pressable
+                accessibilityRole="button"
                 onPress={useCurrentLocation}
                 disabled={isLocating}
                 style={({ pressed }) => [
@@ -521,14 +614,34 @@ export default function EventEditorScreen() {
                   isLocating && styles.disabled,
                 ]}
               >
+                <Ionicons
+                  name="navigate-outline"
+                  size={17}
+                  color={colors.text}
+                />
                 <Text style={styles.locationActionText}>
-                  {isLocating ? "Locating…" : "Use Current Location"}
+                  {isLocating ? "LOCATING…" : "USE CURRENT"}
                 </Text>
               </Pressable>
             </View>
             {coordinatesAttached ? (
-              <Text style={styles.verified}>Location verified</Text>
+              <View style={styles.verifiedRow}>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={16}
+                  color={colors.success}
+                />
+                <Text style={styles.verified}>Exact coordinates attached</Text>
+              </View>
             ) : null}
+          </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.eyebrow}>03 / SCHEDULE</Text>
+              <Text style={styles.sectionTitle}>Set the timeline</Text>
+            </View>
+            <Text style={styles.scheduleLabel}>STARTS</Text>
             <View style={styles.row}>
               <PickerRow
                 label="Start Date"
@@ -540,6 +653,11 @@ export default function EventEditorScreen() {
                 value={timeFormatter.format(form.startAt)}
                 onPress={() => openPicker("startTime")}
               />
+            </View>
+            <View style={styles.scheduleDivider} />
+            <View style={styles.optionalRow}>
+              <Text style={styles.scheduleLabel}>ENDS</Text>
+              <Text style={styles.optionalText}>OPTIONAL</Text>
             </View>
             <View style={styles.row}>
               <PickerRow
@@ -565,45 +683,48 @@ export default function EventEditorScreen() {
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={styles.clearEndText}>Clear end time</Text>
+                <Ionicons
+                  name="close-circle-outline"
+                  size={16}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.clearEndText}>CLEAR END TIME</Text>
               </Pressable>
             ) : null}
-            <Pressable
-              accessibilityRole="switch"
-              accessibilityState={{ checked: form.isPublic }}
-              onPress={() => updateField("isPublic", !form.isPublic)}
-              style={({ pressed }) => [
-                styles.visibility,
-                pressed && styles.pressed,
-              ]}
-            >
-              <View>
-                <Text style={styles.visibilityTitle}>
-                  {form.isPublic ? "Public event" : "Private event"}
-                </Text>
-                <Text style={styles.visibilityText}>
-                  {form.isPublic
-                    ? "Visible to NOXA drivers."
-                    : "Only you can see it for now."}
-                </Text>
-              </View>
-              <View
-                style={[styles.toggle, form.isPublic && styles.toggleActive]}
-              >
-                <View
-                  style={[styles.knob, form.isPublic && styles.knobActive]}
-                />
-              </View>
-            </Pressable>
           </View>
+
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeading}>
+              <Text style={styles.eyebrow}>04 / VISIBILITY</Text>
+              <Text style={styles.sectionTitle}>Choose the audience</Text>
+            </View>
+            <View style={styles.visibilityOptions}>
+              <VisibilityOption
+                active={form.isPublic}
+                description="Visible to every NOXA driver"
+                icon="earth-outline"
+                label="Public"
+                onPress={() => updateField("isPublic", true)}
+              />
+              <VisibilityOption
+                active={!form.isPublic}
+                description="Visible only to you for now"
+                icon="lock-closed-outline"
+                label="Private"
+                onPress={() => updateField("isPublic", false)}
+              />
+            </View>
+          </View>
+        </ScrollView>
+        <View style={styles.fixedFooter}>
           <NoxaButton
-            title={isEditing ? "Save Changes" : "Create Event"}
+            title={isEditing ? "SAVE CHANGES" : "PUBLISH EVENT"}
             fullWidth
             loading={saving}
             disabled={loading || saving || Boolean(isEditing && error)}
             onPress={saveEvent}
           />
-        </ScrollView>
+        </View>
         <Modal
           animationType="slide"
           visible={mapModalVisible}
@@ -711,15 +832,171 @@ function PickerRow({
   );
 }
 
+function VisibilityOption({
+  active,
+  description,
+  icon,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ checked: active }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.visibilityOption,
+        active && styles.visibilityOptionActive,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View style={[styles.visibilityIcon, active && styles.visibilityIconActive]}>
+        <Ionicons
+          name={icon}
+          size={20}
+          color={active ? colors.primaryHover : colors.textMuted}
+        />
+      </View>
+      <Text style={styles.visibilityTitle}>{label}</Text>
+      <Text style={styles.visibilityText}>{description}</Text>
+      <View style={[styles.radio, active && styles.radioActive]}>
+        {active ? <View style={styles.radioDot} /> : null}
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  editorHeader: {
+    minHeight: 62,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+    backgroundColor: colors.surfaceBase,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  headerTitle: {
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.subtitle,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  headerSpacer: { width: 40, height: 40 },
   content: {
     padding: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.lg,
+    paddingBottom: 124,
     gap: spacing.lg,
   },
-  formCard: {
+  previewCard: {
+    minHeight: 214,
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    overflow: "hidden",
+    padding: spacing.lg,
+    borderRadius: radius.hero,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.surface,
+    ...shadows.card,
+  },
+  previewGlow: {
+    position: "absolute",
+    top: -82,
+    right: -54,
+    width: 220,
+    height: 220,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primaryMuted,
+  },
+  previewTopline: {
+    position: "absolute",
+    top: spacing.lg,
+    left: spacing.lg,
+    right: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  previewBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primaryMuted,
+  },
+  previewBadgeText: {
+    color: colors.primaryHover,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  previewStatus: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  previewTitle: {
+    maxWidth: "88%",
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.h2,
+    lineHeight: typography.lineHeight.h2,
+    fontWeight: "900",
+    letterSpacing: -0.3,
+  },
+  previewMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  previewMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+  },
+  previewMetaText: {
+    color: colors.textMuted,
+    fontSize: typography.caption,
+    fontWeight: "700",
+  },
+  previewLocation: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  previewLocationText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: typography.caption,
+    fontWeight: "800",
+  },
+  sectionCard: {
     gap: spacing.md,
     padding: spacing.lg,
     borderRadius: radius.card,
@@ -728,11 +1005,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     ...shadows.card,
   },
+  sectionHeading: { gap: spacing.xxs, marginBottom: spacing.xxs },
+  eyebrow: {
+    color: colors.primaryHover,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.5,
+  },
+  sectionTitle: {
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.title,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
   row: { flexDirection: "row", gap: spacing.sm },
   textArea: {
     minHeight: 112,
     paddingTop: spacing.md,
     textAlignVertical: "top",
+  },
+  characterCount: {
+    marginTop: -spacing.xs,
+    textAlign: "right",
+    color: colors.textSubtle,
+    fontSize: typography.caption,
+    fontWeight: "700",
   },
   pickerRow: {
     flex: 1,
@@ -756,25 +1054,46 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   readOnlyLocation: {
-    gap: spacing.xs,
+    minHeight: 76,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     padding: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceSoft,
   },
+  locationIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryMuted,
+  },
+  locationCopy: { flex: 1, gap: spacing.xxs },
   locationValue: {
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "800",
   },
-  locationButtons: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  locationButtons: { flexDirection: "row", gap: spacing.sm },
   locationAction: {
-    alignSelf: "flex-start",
+    minHeight: 46,
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.button,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  locationActionPrimary: {
     borderColor: colors.borderAccent,
     backgroundColor: colors.primaryMuted,
   },
@@ -782,66 +1101,120 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: typography.caption,
     fontWeight: "900",
+    letterSpacing: 0.4,
+  },
+  verifiedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
   verified: {
-    color: colors.primary,
+    color: colors.success,
     fontSize: typography.caption,
-    fontWeight: "900",
+    fontWeight: "800",
   },
   disabled: { opacity: 0.55 },
+  scheduleLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  scheduleDivider: {
+    height: 1,
+    marginVertical: spacing.xxs,
+    backgroundColor: colors.divider,
+  },
+  optionalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  optionalText: {
+    color: colors.textSubtle,
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
   clearEnd: {
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
     paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
   },
   clearEndText: {
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: "800",
   },
-  visibility: {
-    minHeight: 72,
+  visibilityOptions: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  visibilityOption: {
+    minHeight: 154,
+    flex: 1,
+    gap: spacing.xs,
     padding: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceSoft,
   },
+  visibilityOptionActive: {
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primarySubtle,
+  },
+  visibilityIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.xxs,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+  },
+  visibilityIconActive: { backgroundColor: colors.primaryMuted },
   visibilityTitle: {
     color: colors.text,
     fontSize: typography.body,
     fontWeight: "900",
   },
   visibilityText: {
+    flex: 1,
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: "700",
   },
-  toggle: {
-    width: 54,
-    height: 32,
+  radio: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
     justifyContent: "center",
-    padding: 3,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
   },
-  toggleActive: {
-    backgroundColor: colors.primaryMuted,
-    borderColor: colors.borderAccent,
-  },
-  knob: {
-    width: 24,
-    height: 24,
+  radioActive: { borderColor: colors.primary },
+  radioDot: {
+    width: 10,
+    height: 10,
     borderRadius: radius.pill,
-    backgroundColor: colors.textMuted,
+    backgroundColor: colors.primary,
   },
-  knobActive: { marginLeft: 22, backgroundColor: colors.primary },
+  fixedFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.glass,
+  },
   stateCard: {
     gap: spacing.sm,
     alignItems: "center",
