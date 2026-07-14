@@ -6,13 +6,13 @@ import {
   ActivityIndicator,
   AppState,
   Platform,
-  Switch,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Defs, LinearGradient, Rect, Stop, Svg } from "react-native-svg";
 import MapView, {
   Marker,
   Polyline,
@@ -21,6 +21,7 @@ import MapView, {
   type Region,
 } from "react-native-maps";
 
+import { NoxaCompactLogo } from "@/src/components/brand";
 import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 
@@ -66,6 +67,7 @@ type RouteResult = {
   durationSeconds: number;
 };
 type RouteStatus = "idle" | "loading" | "ready" | "error";
+type MapFilter = "all" | "drivers" | "events";
 
 type ActionButtonProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -82,35 +84,40 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let driverLocationsMapChannelSequence = 0;
 
-const TAB_BAR_HEIGHT = 82;
-const TAB_BAR_BOTTOM_GAP = spacing.md;
+const TAB_BAR_HEIGHT = 84;
+const TAB_BAR_BOTTOM_GAP = 0;
 const FLOATING_GAP = spacing.sm;
+const MAP_FILTERS: { id: MapFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "drivers", label: "Drivers" },
+  { id: "events", label: "Events" },
+];
 
 const androidNoxaMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#0A0C0F" }] },
+  { elementType: "geometry", stylers: [{ color: "#0C0C10" }] },
   { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#737984" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#090B0E" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#6E6E78" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#06060A" }] },
   {
     featureType: "administrative",
     elementType: "geometry.stroke",
-    stylers: [{ color: "#1B2028" }],
+    stylers: [{ color: "#26262D" }],
   },
   {
     featureType: "landscape",
     elementType: "geometry",
-    stylers: [{ color: "#0A0C0F" }],
+    stylers: [{ color: "#0C0C10" }],
   },
   {
     featureType: "landscape.natural",
     elementType: "geometry",
-    stylers: [{ color: "#111419" }],
+    stylers: [{ color: "#111116" }],
   },
   { featureType: "poi.business", stylers: [{ visibility: "off" }] },
   {
     featureType: "poi.park",
     elementType: "geometry",
-    stylers: [{ color: "#111419" }],
+    stylers: [{ color: "#111B17" }],
   },
   { featureType: "poi.school", stylers: [{ visibility: "off" }] },
   { featureType: "poi.shopping_mall", stylers: [{ visibility: "off" }] },
@@ -119,28 +126,28 @@ const androidNoxaMapStyle = [
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [{ color: "#242830" }],
+    stylers: [{ color: "#26262D" }],
   },
   {
     featureType: "road.arterial",
     elementType: "geometry",
-    stylers: [{ color: "#2C313A" }],
+    stylers: [{ color: "#303038" }],
   },
   {
     featureType: "road.highway",
     elementType: "geometry",
-    stylers: [{ color: "#343943" }],
+    stylers: [{ color: "#3A3A43" }],
   },
   {
     featureType: "road.local",
     elementType: "geometry",
-    stylers: [{ color: "#1D222A" }],
+    stylers: [{ color: "#1F1F25" }],
   },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [{ color: "#070A0E" }],
+    stylers: [{ color: "#080C14" }],
   },
 ] satisfies MapViewProps["customMapStyle"];
 
@@ -156,8 +163,45 @@ function HeaderAction({
       onPress={onPress}
       style={styles.headerAction}
     >
-      <Ionicons name={icon} size={20} color={colors.text} />
+      <Ionicons name={icon} size={17} color={colors.text} />
     </TouchableOpacity>
+  );
+}
+
+function MapFilterBar({
+  active,
+  onChange,
+  top,
+}: {
+  active: MapFilter;
+  onChange: (filter: MapFilter) => void;
+  top: number;
+}) {
+  return (
+    <View style={[styles.filterBar, { top }]}>
+      {MAP_FILTERS.map((filter) => {
+        const selected = active === filter.id;
+        return (
+          <TouchableOpacity
+            key={filter.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            activeOpacity={0.78}
+            onPress={() => onChange(filter.id)}
+            style={[styles.filterPill, selected && styles.filterPillActive]}
+          >
+            <Text
+              style={[
+                styles.filterPillText,
+                selected && styles.filterPillTextActive,
+              ]}
+            >
+              {filter.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 
@@ -260,30 +304,53 @@ function formatDuration(seconds: number) {
 function EventCard({
   event,
   bottomOffset,
+  onClose,
 }: {
   event: EventMarkerRow;
   bottomOffset: number;
+  onClose: () => void;
 }) {
   return (
     <View style={[styles.eventCard, { bottom: bottomOffset }]}>
-      <Text style={styles.cardKicker}>Upcoming event</Text>
-      <Text style={styles.cardTitle}>{event.title}</Text>
-      <Text style={styles.cardSubtitle}>
-        {formatEventTime(event.starts_at)}
-      </Text>
-      <Text style={styles.cardLocation} numberOfLines={1}>
-        {event.location_name ?? "Exact location selected"}
-      </Text>
-      <TouchableOpacity
-        activeOpacity={0.82}
-        onPress={() =>
-          router.push({ pathname: "/event-details", params: { id: event.id } })
-        }
-        style={styles.eventButton}
-      >
-        <Text style={styles.eventButtonText}>View Event</Text>
-        <Ionicons name="chevron-forward" size={16} color={colors.text} />
-      </TouchableOpacity>
+      <View style={styles.eventCardHeader}>
+        <View style={styles.eventCardCopy}>
+          <Text style={styles.cardKicker}>Upcoming event</Text>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {event.title}
+          </Text>
+          <Text style={styles.cardSubtitle}>
+            {formatEventTime(event.starts_at)}
+          </Text>
+          <Text style={styles.cardLocation} numberOfLines={1}>
+            {event.location_name ?? "Exact location selected"}
+          </Text>
+        </View>
+        <View style={styles.eventCardIcon}>
+          <Ionicons name="calendar-outline" size={18} color={colors.text} />
+        </View>
+      </View>
+      <View style={styles.eventActions}>
+        <TouchableOpacity
+          activeOpacity={0.82}
+          onPress={() =>
+            router.push({
+              pathname: "/event-details",
+              params: { id: event.id },
+            })
+          }
+          style={styles.eventButton}
+        >
+          <Text style={styles.eventButtonText}>View Event</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityLabel="Close event preview"
+          activeOpacity={0.78}
+          onPress={onClose}
+          style={styles.eventCloseButton}
+        >
+          <Text style={styles.eventCloseButtonText}>Close</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -413,6 +480,7 @@ export default function LiveMapScreen() {
   const [isVisibleOnMap, setIsVisibleOnMap] = useState(false);
   const [sharingError, setSharingError] = useState<string | null>(null);
   const [activeDrivers, setActiveDrivers] = useState<ActiveDriver[]>([]);
+  const [mapFilter, setMapFilter] = useState<MapFilter>("all");
   const normalizedFocusEventId = normalizeParam(params.focusEventId);
   const normalizedMapMode = normalizeParam(params.mapMode);
   const focusEventId =
@@ -894,6 +962,11 @@ export default function LiveMapScreen() {
     [animateTo],
   );
 
+  const changeMapFilter = useCallback((filter: MapFilter) => {
+    setMapFilter(filter);
+    if (filter === "drivers") setSelectedEvent(null);
+  }, []);
+
   const recenterMap = useCallback(async () => {
     const point =
       driverLocation ?? (await loadDriverLocation().catch(() => null));
@@ -901,13 +974,17 @@ export default function LiveMapScreen() {
   }, [animateTo, driverLocation, loadDriverLocation]);
 
   const headerTop = insets.top + spacing.sm;
-  const headerBottom = headerTop + 52;
+  const headerBottom = headerTop + 34;
+  const filtersTop = headerBottom + spacing.sm;
+  const filtersBottom = filtersTop + 32;
+  const visibilityTop = filtersBottom + 10;
+  const noticesTop = visibilityTop + 42;
   const eventCardBottom =
     insets.bottom + TAB_BAR_BOTTOM_GAP + TAB_BAR_HEIGHT + FLOATING_GAP;
   const routeCardBottom = eventCardBottom;
   const controlBottom =
     eventCardBottom +
-    (isRouteMode && selectedEvent ? 168 : selectedEvent ? 188 : spacing.md);
+    (isRouteMode && selectedEvent ? 168 : selectedEvent ? 196 : 62);
 
   return (
     <View style={styles.screen}>
@@ -949,41 +1026,66 @@ export default function LiveMapScreen() {
             />
           </>
         ) : null}
-        {activeDrivers.map((driver) => (
-          <DriverMarker key={driver.user_id} driver={driver} />
-        ))}
-        {events.map((event) => (
-          <Marker
-            key={event.id}
-            coordinate={{
-              latitude: event.latitude,
-              longitude: event.longitude,
-            }}
-            onPress={() => selectEvent(event)}
-            title={event.title}
-          >
-            <View
-              style={[
-                styles.markerDot,
-                selectedEvent?.id === event.id && styles.markerDotSelected,
-              ]}
-            >
-              <Ionicons name="flag" size={14} color={colors.text} />
-            </View>
-          </Marker>
-        ))}
+        {mapFilter !== "events"
+          ? activeDrivers.map((driver) => (
+              <DriverMarker key={driver.user_id} driver={driver} />
+            ))
+          : null}
+        {mapFilter !== "drivers" || isRouteMode
+          ? events.map((event) => (
+              <Marker
+                key={event.id}
+                coordinate={{
+                  latitude: event.latitude,
+                  longitude: event.longitude,
+                }}
+                onPress={() => selectEvent(event)}
+                title={event.title}
+              >
+                <View
+                  style={[
+                    styles.markerDot,
+                    selectedEvent?.id === event.id &&
+                      styles.markerDotSelected,
+                  ]}
+                >
+                  <Ionicons name="flag" size={13} color={colors.text} />
+                </View>
+              </Marker>
+            ))
+          : null}
       </MapView>
 
       <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
+        <Svg
+          height={noticesTop + 70}
+          pointerEvents="none"
+          style={styles.topScrim}
+          width="100%"
+        >
+          <Defs>
+            <LinearGradient id="mapTopFade" x1="0" x2="0" y1="0" y2="1">
+              <Stop offset="0" stopColor={colors.background} stopOpacity="0.9" />
+              <Stop
+                offset="0.62"
+                stopColor={colors.background}
+                stopOpacity="0.54"
+              />
+              <Stop offset="1" stopColor={colors.background} stopOpacity="0" />
+            </LinearGradient>
+          </Defs>
+          <Rect fill="url(#mapTopFade)" height="100%" width="100%" />
+        </Svg>
+
         <View style={[styles.header, { top: headerTop }]}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>N</Text>
-          </View>
-          <View pointerEvents="none" style={styles.logoWrap}>
-            <View style={styles.logoSpeedLine} />
-            <Text style={styles.logo}>NOXA</Text>
-          </View>
+          <NoxaCompactLogo />
           <View style={styles.headerActions}>
+            <View style={styles.onlinePill}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.onlineText}>
+                {activeDrivers.length} online
+              </Text>
+            </View>
             <HeaderAction
               icon="search-outline"
               accessibilityLabel="Search"
@@ -997,31 +1099,50 @@ export default function LiveMapScreen() {
           </View>
         </View>
 
-        <View
-          style={[styles.visibilityControl, { top: headerBottom + spacing.sm }]}
+        <MapFilterBar
+          active={mapFilter}
+          onChange={changeMapFilter}
+          top={filtersTop}
+        />
+
+        <TouchableOpacity
+          accessibilityLabel="Toggle temporary visibility on the NOXA map"
+          accessibilityHint="Location sharing lasts only while this map is open"
+          accessibilityRole="switch"
+          accessibilityState={{ checked: isVisibleOnMap }}
+          activeOpacity={0.78}
+          onPress={() => toggleVisibility(!isVisibleOnMap)}
+          style={[
+            styles.visibilityControl,
+            isVisibleOnMap && styles.visibilityControlActive,
+            { top: visibilityTop },
+          ]}
         >
-          <View style={styles.visibilityCopy}>
-            <Text style={styles.visibilityTitle}>Visible on Map</Text>
-            <Text style={styles.visibilityText}>
-              Temporary while this map is open.
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabel="Toggle temporary visibility on the NOXA map"
-            value={isVisibleOnMap}
-            onValueChange={toggleVisibility}
-            trackColor={{
-              false: "rgba(255,255,255,0.16)",
-              true: "rgba(215,25,32,0.44)",
-            }}
-            thumbColor={isVisibleOnMap ? colors.text : "#737984"}
+          <Ionicons
+            name={isVisibleOnMap ? "eye" : "eye-off-outline"}
+            size={15}
+            color={isVisibleOnMap ? colors.primaryHover : colors.textMuted}
           />
-        </View>
+          <Text
+            style={[
+              styles.visibilityTitle,
+              isVisibleOnMap && styles.visibilityTitleActive,
+            ]}
+          >
+            {isVisibleOnMap ? "Visible" : "Hidden"}
+          </Text>
+          <View
+            style={[
+              styles.visibilityStatus,
+              isVisibleOnMap && styles.visibilityStatusActive,
+            ]}
+          />
+        </TouchableOpacity>
 
         {sharingError ? (
           <View
             pointerEvents="none"
-            style={[styles.sharingNotice, { top: headerBottom + 74 }]}
+            style={[styles.sharingNotice, { top: noticesTop }]}
           >
             <Text style={styles.locationNoticeText}>{sharingError}</Text>
           </View>
@@ -1032,12 +1153,40 @@ export default function LiveMapScreen() {
             pointerEvents="none"
             style={[
               styles.locationNotice,
-              { top: headerBottom + (sharingError ? 118 : 74) },
+              { top: noticesTop + (sharingError ? 46 : 0) },
             ]}
           >
             <Text style={styles.locationNoticeText}>
               Location off — centered on NOXA map.
             </Text>
+          </View>
+        ) : null}
+
+        {!selectedEvent ? (
+          <View
+            pointerEvents="none"
+            style={[styles.nearbySummary, { bottom: eventCardBottom }]}
+          >
+            <Text style={styles.nearbyLabel}>Nearby</Text>
+            <View style={styles.nearbyMetrics}>
+              <View style={styles.nearbyMetric}>
+                <View style={styles.nearbyDriverDot} />
+                <Text style={styles.nearbyMetricText}>
+                  {activeDrivers.length} drivers
+                </Text>
+              </View>
+              <View style={styles.nearbyDivider} />
+              <View style={styles.nearbyMetric}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={14}
+                  color={colors.primaryHover}
+                />
+                <Text style={styles.nearbyMetricText}>
+                  {events.length} events
+                </Text>
+              </View>
+            </View>
           </View>
         ) : null}
 
@@ -1061,7 +1210,11 @@ export default function LiveMapScreen() {
             onRetry={retryRoute}
           />
         ) : selectedEvent ? (
-          <EventCard event={selectedEvent} bottomOffset={eventCardBottom} />
+          <EventCard
+            event={selectedEvent}
+            bottomOffset={eventCardBottom}
+            onClose={() => setSelectedEvent(null)}
+          />
         ) : null}
       </View>
     </View>
@@ -1069,249 +1222,359 @@ export default function LiveMapScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, overflow: "hidden", backgroundColor: "#050608" },
+  screen: { flex: 1, overflow: "hidden", backgroundColor: colors.background },
+  topScrim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+  },
   header: {
     position: "absolute",
     left: spacing.md,
     right: spacing.md,
-    height: 52,
+    height: 34,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.11)",
-    backgroundColor: "rgba(8,10,14,0.56)",
-    shadowColor: "#000",
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
   },
-  avatar: {
-    width: 44,
-    height: 44,
+  headerActions: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "#141821",
+    gap: 6,
   },
-  avatarText: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "900",
-  },
-  logoWrap: {
-    position: "absolute",
-    left: 0,
-    right: 0,
+  onlinePill: {
+    height: 28,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-  },
-  logoSpeedLine: {
-    width: 44,
-    height: 2,
-    marginBottom: 5,
+    gap: 6,
+    paddingHorizontal: 9,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.34)",
-    backgroundColor: "rgba(255,36,36,0.96)",
-    shadowColor: colors.accent,
-    shadowOpacity: 0.9,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
+    borderColor: colors.borderStrong,
+    backgroundColor: "rgba(12,12,16,0.78)",
   },
-  logo: {
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  onlineText: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: "900",
-    letterSpacing: 7.2,
+    fontSize: 11,
+    fontWeight: "500",
   },
-  headerActions: { flexDirection: "row", gap: spacing.sm },
   headerAction: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.13)",
-    backgroundColor: "#131720",
-  },
-  driverMarker: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.78)",
-    backgroundColor: "rgba(20,24,33,0.94)",
-  },
-  driverMarkerAccent: {
-    position: "absolute",
-    top: 3,
-    right: 3,
-    width: 7,
-    height: 7,
-    borderRadius: radius.pill,
-    backgroundColor: colors.accent,
-  },
-  markerDot: {
     width: 34,
     height: 34,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: "rgba(12,12,16,0.72)",
+  },
+  filterBar: {
+    position: "absolute",
+    left: spacing.md,
+    flexDirection: "row",
+    gap: 6,
+  },
+  filterPill: {
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 13,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "rgba(24,24,29,0.84)",
+  },
+  filterPillActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  filterPillText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  filterPillTextActive: {
+    color: colors.text,
+    fontWeight: "600",
+  },
+  driverMarker: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.72)",
-    backgroundColor: colors.accentDark,
+    borderColor: colors.primary,
+    backgroundColor: "rgba(17,17,22,0.96)",
+    shadowColor: colors.black,
+    shadowOpacity: 0.42,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  driverMarkerAccent: {
+    position: "absolute",
+    right: -1,
+    bottom: -1,
+    width: 7,
+    height: 7,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+    backgroundColor: colors.success,
+  },
+  markerDot: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: colors.primary,
+    shadowColor: colors.black,
+    shadowOpacity: 0.4,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
   markerDotSelected: {
-    backgroundColor: "#D71920",
-    transform: [{ scale: 1.08 }],
+    borderColor: colors.white,
+    backgroundColor: colors.primaryHover,
+    transform: [{ scale: 1.1 }],
   },
   visibilityControl: {
     position: "absolute",
-    left: spacing.md,
     right: spacing.md,
-    minHeight: 58,
+    height: 32,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.card,
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.11)",
-    backgroundColor: "rgba(10,12,16,0.88)",
+    borderColor: colors.borderStrong,
+    backgroundColor: "rgba(12,12,16,0.82)",
   },
-  visibilityCopy: { flex: 1 },
+  visibilityControlActive: {
+    borderColor: colors.borderAccent,
+    backgroundColor: "rgba(200,16,46,0.12)",
+  },
   visibilityTitle: {
-    color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "900",
-  },
-  visibilityText: {
-    marginTop: 1,
     color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  visibilityTitleActive: {
+    color: colors.text,
+  },
+  visibilityStatus: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.textSubtle,
+  },
+  visibilityStatusActive: {
+    backgroundColor: colors.primaryHover,
   },
   sharingNotice: {
     position: "absolute",
     left: spacing.md,
     right: spacing.md,
     alignItems: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "rgba(10,12,16,0.86)",
+    backgroundColor: "rgba(12,12,16,0.9)",
   },
   locationNotice: {
     position: "absolute",
-    top: spacing.md,
     left: spacing.md,
     right: spacing.md,
     alignItems: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: "rgba(10,12,16,0.86)",
+    backgroundColor: "rgba(12,12,16,0.9)",
   },
   locationNoticeText: {
     color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  nearbySummary: {
+    position: "absolute",
+    left: spacing.md,
+    right: spacing.md,
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "rgba(17,17,22,0.9)",
+    ...shadows.card,
+  },
+  nearbyLabel: {
+    color: colors.textSubtle,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  nearbyMetrics: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  nearbyMetric: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  nearbyDriverDot: {
+    width: 7,
+    height: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  nearbyMetricText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  nearbyDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 16,
+    backgroundColor: colors.borderStrong,
   },
   recenterButton: {
     position: "absolute",
-    right: spacing.lg,
-    width: 48,
-    height: 48,
+    right: spacing.md,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(10,12,16,0.88)",
-    shadowColor: "#000",
-    shadowOpacity: 0.24,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    borderColor: colors.borderStrong,
+    backgroundColor: "rgba(12,12,16,0.88)",
+    ...shadows.control,
   },
   eventCard: {
     position: "absolute",
-    left: spacing.lg,
-    right: spacing.lg,
-    padding: spacing.lg,
+    left: spacing.md,
+    right: spacing.md,
+    padding: 14,
     borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.11)",
-    backgroundColor: "rgba(10,12,16,0.9)",
+    borderColor: colors.border,
+    backgroundColor: "rgba(17,17,22,0.94)",
     ...shadows.card,
   },
+  eventCardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  eventCardCopy: {
+    flex: 1,
+  },
+  eventCardIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
   cardKicker: {
-    color: colors.accent,
-    fontSize: typography.caption,
-    fontWeight: "800",
-    letterSpacing: 1.2,
+    color: colors.primaryHover,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1.3,
     textTransform: "uppercase",
   },
   cardTitle: {
     marginTop: 4,
     color: colors.text,
-    fontSize: 24,
-    fontWeight: "900",
-    letterSpacing: -0.7,
+    fontSize: 16,
+    fontWeight: "600",
+    letterSpacing: -0.3,
+    lineHeight: 20,
   },
   cardSubtitle: {
-    marginTop: 2,
+    marginTop: 4,
     color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "500",
   },
   cardLocation: {
     marginTop: 2,
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "600",
+    color: colors.textSubtle,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  eventActions: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    gap: spacing.xs,
   },
   eventButton: {
-    marginTop: spacing.sm,
-    height: 44,
+    flex: 1,
+    height: 40,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xs,
-    borderRadius: radius.pill,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,36,36,0.44)",
-    backgroundColor: "#D71920",
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
   },
   eventButtonText: {
     color: colors.text,
-    fontSize: typography.body,
-    fontWeight: "800",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  eventCloseButton: {
+    flex: 1,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
+  },
+  eventCloseButtonText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: "600",
   },
   routeCard: {
     position: "absolute",
-    left: spacing.lg,
-    right: spacing.lg,
-    padding: spacing.lg,
+    left: spacing.md,
+    right: spacing.md,
+    padding: spacing.md,
     borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: "rgba(255,36,36,0.24)",
-    backgroundColor: "rgba(10,12,16,0.94)",
+    borderColor: colors.borderAccent,
+    backgroundColor: "rgba(17,17,22,0.96)",
     ...shadows.card,
   },
   routeHeader: {
@@ -1324,9 +1587,9 @@ const styles = StyleSheet.create({
   routeTitle: {
     marginTop: 3,
     color: colors.text,
-    fontSize: typography.cardTitle,
-    fontWeight: "900",
-    letterSpacing: -0.4,
+    fontSize: 16,
+    fontWeight: "600",
+    letterSpacing: -0.3,
   },
   routeCloseButton: {
     width: 38,
@@ -1335,8 +1598,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSoft,
   },
   routeStatusRow: {
     marginTop: spacing.md,
@@ -1348,7 +1611,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     color: colors.textMuted,
     fontSize: typography.caption,
-    fontWeight: "800",
+    fontWeight: "500",
   },
   routeMetrics: {
     marginTop: spacing.md,
@@ -1359,26 +1622,26 @@ const styles = StyleSheet.create({
   routeMetric: {
     color: colors.text,
     fontSize: typography.body,
-    fontWeight: "900",
+    fontWeight: "600",
   },
   routeMetricMuted: {
     color: colors.textMuted,
     fontSize: typography.caption,
-    fontWeight: "900",
+    fontWeight: "600",
   },
   routeRetryButton: {
     marginTop: spacing.md,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radius.pill,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,36,36,0.44)",
-    backgroundColor: "rgba(215,25,32,0.18)",
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primaryMuted,
   },
   routeRetryText: {
     color: colors.text,
     fontSize: typography.caption,
-    fontWeight: "900",
+    fontWeight: "600",
   },
 });
