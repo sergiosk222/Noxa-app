@@ -414,6 +414,229 @@ function CrewOverview({
   );
 }
 
+function SectionHeading({
+  caption,
+  count,
+  title,
+}: {
+  caption: string;
+  count?: number;
+  title: string;
+}) {
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={styles.sectionHeadingCopy}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionCaption}>{caption}</Text>
+      </View>
+      {typeof count === "number" ? (
+        <View style={styles.countPill}>
+          <Text style={styles.countPillText}>{count}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function MemberRoster({
+  currentUserId,
+  isAdmin,
+  isOwner,
+  memberActionId,
+  members,
+  onOpenMember,
+  onRemoveMember,
+  onSetRole,
+}: {
+  currentUserId: string | null;
+  isAdmin: boolean;
+  isOwner: boolean;
+  memberActionId: string | null;
+  members: Member[];
+  onOpenMember: (memberId: string) => void;
+  onRemoveMember: (member: Member) => void;
+  onSetRole: (member: Member, role: "admin" | "member") => void;
+}) {
+  return (
+    <View style={styles.sectionBlock}>
+      <SectionHeading
+        caption="Drivers, roles, and permissions"
+        count={members.length}
+        title="CREW MEMBERS"
+      />
+      {members.length === 0 ? (
+        <View style={styles.emptyPanel}>
+          <Ionicons name="people-outline" size={24} color={colors.textSubtle} />
+          <Text style={styles.emptyText}>No visible members yet.</Text>
+        </View>
+      ) : (
+        <View style={styles.rosterCard}>
+          {members.map((member, index) => {
+            const canPromote = isOwner && member.role === "member";
+            const canDemote = isOwner && member.role === "admin";
+            const canRemove =
+              member.role !== "owner" &&
+              currentUserId !== member.user_id &&
+              (isOwner || (isAdmin && member.role === "member"));
+            const isBusy = memberActionId === member.user_id;
+
+            return (
+              <View
+                key={member.user_id}
+                style={[
+                  styles.memberItem,
+                  index < members.length - 1 && styles.memberItemBorder,
+                ]}>
+                <Pressable
+                  accessibilityLabel={`Open ${displayName(member.profile)} profile`}
+                  accessibilityRole="button"
+                  onPress={() => onOpenMember(member.user_id)}
+                  style={({ pressed }) => [styles.memberMainRow, pressed && styles.pressed]}>
+                  <ProfileAvatar profile={member.profile} size={46} />
+                  <View style={styles.personCopy}>
+                    <Text style={styles.personName}>{displayName(member.profile)}</Text>
+                    <Text style={styles.personMeta}>
+                      {member.profile?.username
+                        ? `@${member.profile.username}`
+                        : (member.profile?.city ?? "NOXA driver")}
+                    </Text>
+                  </View>
+                  <NoxaBadge
+                    label={
+                      member.role === "owner"
+                        ? "OWNER"
+                        : member.role === "admin"
+                          ? "ADMIN"
+                          : "MEMBER"
+                    }
+                    variant={
+                      member.role === "owner"
+                        ? "primary"
+                        : member.role === "admin"
+                          ? "warning"
+                          : "default"
+                    }
+                  />
+                </Pressable>
+
+                {canPromote || canDemote || canRemove ? (
+                  <View style={styles.memberActionBar}>
+                    {canPromote ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={isBusy}
+                        onPress={() => onSetRole(member, "admin")}
+                        style={({ pressed }) => [
+                          styles.roleAction,
+                          styles.promoteAction,
+                          pressed && styles.pressed,
+                          isBusy && styles.disabled,
+                        ]}>
+                        <Ionicons name="shield-outline" size={14} color={colors.primaryHover} />
+                        <Text style={styles.promoteActionText}>{isBusy ? "Working…" : "Make Admin"}</Text>
+                      </Pressable>
+                    ) : null}
+                    {canDemote ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={isBusy}
+                        onPress={() => onSetRole(member, "member")}
+                        style={({ pressed }) => [
+                          styles.roleAction,
+                          pressed && styles.pressed,
+                          isBusy && styles.disabled,
+                        ]}>
+                        <Text style={styles.roleActionText}>{isBusy ? "Working…" : "Make Member"}</Text>
+                      </Pressable>
+                    ) : null}
+                    {canRemove ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={isBusy}
+                        onPress={() => onRemoveMember(member)}
+                        style={({ pressed }) => [
+                          styles.roleAction,
+                          styles.removeAction,
+                          pressed && styles.pressed,
+                          isBusy && styles.disabled,
+                        ]}>
+                        <Ionicons name="person-remove-outline" size={14} color={colors.primaryHover} />
+                        <Text style={styles.removeActionText}>Remove</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function CrewGarage({
+  onOpenVehicle,
+  ownerNamesById,
+  vehicles,
+}: {
+  onOpenVehicle: (vehicleId: string) => void;
+  ownerNamesById: Map<string, string>;
+  vehicles: Vehicle[];
+}) {
+  return (
+    <View style={styles.sectionBlock}>
+      <SectionHeading
+        caption="Public builds from the roster"
+        count={vehicles.length}
+        title="CREW GARAGE"
+      />
+      {vehicles.length === 0 ? (
+        <View style={styles.emptyPanel}>
+          <Ionicons name="car-sport-outline" size={26} color={colors.textSubtle} />
+          <Text style={styles.emptyText}>No public member cars yet.</Text>
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          contentContainerStyle={styles.garageRail}
+          showsHorizontalScrollIndicator={false}>
+          {vehicles.map((vehicle) => (
+            <Pressable
+              key={vehicle.id}
+              accessibilityLabel={`Open ${vehicleName(vehicle)}`}
+              accessibilityRole="button"
+              onPress={() => onOpenVehicle(vehicle.id)}
+              style={({ pressed }) => [styles.garageCard, pressed && styles.pressed]}>
+              {vehicle.cover_image_url ? (
+                <Image source={{ uri: vehicle.cover_image_url }} style={styles.garageImage} />
+              ) : (
+                <View style={[styles.garageImage, styles.garagePlaceholder]}>
+                  <Ionicons name="car-sport" size={34} color={colors.primary} />
+                </View>
+              )}
+              <View style={styles.garageCardBody}>
+                <Text numberOfLines={1} style={styles.garageTitle}>
+                  {vehicleName(vehicle)}
+                </Text>
+                <Text numberOfLines={1} style={styles.garageOwner}>
+                  {ownerNamesById.get(vehicle.owner_id) ?? "NOXA driver"}
+                </Text>
+                <View style={styles.garageMetaRow}>
+                  {vehicle.horsepower ? (
+                    <Text style={styles.garageMeta}>{vehicle.horsepower} HP</Text>
+                  ) : null}
+                  {vehicle.color ? <Text style={styles.garageMeta}>{vehicle.color}</Text> : null}
+                </View>
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
 export default function CrewDetailsScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const crewId = useMemo(() => normalizeId(id), [id]);
@@ -1253,176 +1476,31 @@ export default function CrewDetailsScreen() {
                 ) : null}
               </NoxaCard>
             ) : null}
-            <NoxaCard>
-              <Text style={styles.cardTitle}>Members</Text>
-              {members.length === 0 ? (
-                <Text style={styles.emptyText}>No visible members yet.</Text>
-              ) : (
-                <View style={styles.list}>
-                  {members.map((member) => {
-                    const canPromote = isOwner && member.role === "member";
-                    const canDemote = isOwner && member.role === "admin";
-                    const canRemove =
-                      member.role !== "owner" &&
-                      currentUserId !== member.user_id &&
-                      (isOwner || (isAdmin && member.role === "member"));
-                    return (
-                      <View key={member.user_id} style={styles.memberRow}>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel="Open member driver profile"
-                          onPress={() =>
-                            router.push({
-                              pathname: "/driver-profile/[id]",
-                              params: { id: member.user_id },
-                            })
-                          }
-                          style={({ pressed }) => [
-                            styles.personRow,
-                            styles.memberProfilePress,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <ProfileAvatar profile={member.profile} />
-                          <View style={styles.personCopy}>
-                            <Text style={styles.personName}>
-                              {displayName(member.profile)}
-                            </Text>
-                            <Text style={styles.personMeta}>
-                              {member.profile?.username
-                                ? `@${member.profile.username}`
-                                : (member.profile?.city ?? "NOXA driver")}
-                            </Text>
-                          </View>
-                          <NoxaBadge
-                            label={
-                              member.role === "owner"
-                                ? "Owner"
-                                : member.role === "admin"
-                                  ? "Admin"
-                                  : "Member"
-                            }
-                            variant={
-                              member.role === "owner" ? "primary" : "default"
-                            }
-                          />
-                        </Pressable>
-                        {canPromote || canDemote || canRemove ? (
-                          <View style={styles.memberControls}>
-                            {canPromote ? (
-                              <Pressable
-                                disabled={memberActionId === member.user_id}
-                                onPress={() => setMemberRole(member, "admin")}
-                                style={({ pressed }) => [
-                                  styles.miniAction,
-                                  pressed && styles.pressed,
-                                ]}
-                              >
-                                <Text style={styles.miniActionText}>
-                                  Promote
-                                </Text>
-                              </Pressable>
-                            ) : null}
-                            {canDemote ? (
-                              <Pressable
-                                disabled={memberActionId === member.user_id}
-                                onPress={() => setMemberRole(member, "member")}
-                                style={({ pressed }) => [
-                                  styles.miniAction,
-                                  styles.miniActionDisabled,
-                                  pressed && styles.pressed,
-                                ]}
-                              >
-                                <Text style={styles.miniActionText}>
-                                  Demote
-                                </Text>
-                              </Pressable>
-                            ) : null}
-                            {canRemove ? (
-                              <Pressable
-                                disabled={memberActionId === member.user_id}
-                                onPress={() => removeMember(member)}
-                                style={({ pressed }) => [
-                                  styles.miniAction,
-                                  styles.dangerMiniAction,
-                                  pressed && styles.pressed,
-                                ]}
-                              >
-                                <Text style={styles.miniActionText}>
-                                  Remove
-                                </Text>
-                              </Pressable>
-                            ) : null}
-                          </View>
-                        ) : null}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-            </NoxaCard>
-            <NoxaCard>
-              <Text style={styles.cardTitle}>Crew Garage</Text>
-              {vehicles.length === 0 ? (
-                <Text style={styles.emptyText}>No public member cars yet.</Text>
-              ) : (
-                <View style={styles.list}>
-                  {vehicles.map((vehicle) => (
-                    <Pressable
-                      key={vehicle.id}
-                      accessibilityRole="button"
-                      accessibilityLabel="Open vehicle details"
-                      onPress={() =>
-                        router.push({
-                          pathname: "/vehicle-details",
-                          params: { id: vehicle.id },
-                        })
-                      }
-                      style={({ pressed }) => [
-                        styles.vehicleRow,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      {vehicle.cover_image_url ? (
-                        <Image
-                          source={{ uri: vehicle.cover_image_url }}
-                          style={styles.vehicleImage}
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            styles.vehicleImage,
-                            styles.vehiclePlaceholder,
-                          ]}
-                        >
-                          <Ionicons
-                            name="car-sport"
-                            size={28}
-                            color={colors.primary}
-                          />
-                        </View>
-                      )}
-                      <View style={styles.personCopy}>
-                        <Text style={styles.personName}>
-                          {vehicleName(vehicle)}
-                        </Text>
-                        <Text style={styles.personMeta}>
-                          {[
-                            ownerById.get(vehicle.owner_id),
-                            vehicle.horsepower
-                              ? `${vehicle.horsepower} HP`
-                              : null,
-                            vehicle.color,
-                          ]
-                            .filter(isPresent)
-                            .join(" • ")}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </NoxaCard>
+            <MemberRoster
+              currentUserId={currentUserId}
+              isAdmin={isAdmin}
+              isOwner={isOwner}
+              memberActionId={memberActionId}
+              members={members}
+              onOpenMember={(memberId) =>
+                router.push({
+                  pathname: "/driver-profile/[id]",
+                  params: { id: memberId },
+                })
+              }
+              onRemoveMember={removeMember}
+              onSetRole={setMemberRole}
+            />
+            <CrewGarage
+              onOpenVehicle={(vehicleId) =>
+                router.push({
+                  pathname: "/vehicle-details",
+                  params: { id: vehicleId },
+                })
+              }
+              ownerNamesById={ownerById}
+              vehicles={vehicles}
+            />
           </>
         ) : null}
       </ScrollView>
@@ -1734,9 +1812,93 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: "900",
   },
-  memberRow: { gap: spacing.sm },
-  memberProfilePress: { flex: 1 },
-  memberControls: { flexDirection: "row", gap: spacing.sm, paddingLeft: 60 },
+  sectionBlock: { gap: spacing.sm },
+  sectionHeading: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.md,
+  },
+  sectionHeadingCopy: { flex: 1 },
+  sectionTitle: {
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.subtitle,
+    fontWeight: "900",
+    letterSpacing: 0.7,
+  },
+  sectionCaption: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  countPill: {
+    minWidth: 30,
+    minHeight: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  countPillText: { color: colors.textMuted, fontSize: 11, fontWeight: "900" },
+  emptyPanel: {
+    minHeight: 94,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  rosterCard: {
+    overflow: "hidden",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  memberItem: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  memberItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.divider },
+  memberMainRow: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderRadius: radius.md,
+  },
+  memberActionBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    paddingTop: spacing.xs,
+    paddingLeft: 58,
+  },
+  roleAction: {
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceSoft,
+  },
+  promoteAction: {
+    borderColor: colors.borderAccent,
+    backgroundColor: colors.primarySubtle,
+  },
+  removeAction: { borderColor: colors.borderAccent },
+  roleActionText: { color: colors.textMuted, fontSize: 10, fontWeight: "900" },
+  promoteActionText: { color: colors.primaryHover, fontSize: 10, fontWeight: "900" },
+  removeActionText: { color: colors.primaryHover, fontSize: 10, fontWeight: "900" },
   requestActions: { flexDirection: "row", gap: spacing.sm },
   miniAction: {
     minHeight: 32,
@@ -1751,7 +1913,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  dangerMiniAction: { backgroundColor: colors.primary },
   miniActionText: {
     color: colors.text,
     fontSize: typography.caption,
@@ -1763,22 +1924,39 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 22,
   },
-  vehicleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    borderRadius: radius.button,
-  },
-  vehicleImage: {
-    width: 72,
-    height: 52,
-    borderRadius: radius.button,
-    backgroundColor: colors.surfaceSoft,
-  },
-  vehiclePlaceholder: {
-    alignItems: "center",
-    justifyContent: "center",
+  garageRail: { gap: spacing.md, paddingRight: spacing.lg },
+  garageCard: {
+    width: 224,
+    overflow: "hidden",
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  garageImage: {
+    width: "100%",
+    height: 124,
+    backgroundColor: colors.surfaceSoft,
+  },
+  garagePlaceholder: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  garageCardBody: { gap: 2, padding: spacing.md },
+  garageTitle: {
+    color: colors.text,
+    fontFamily: typography.fontFamily.display,
+    fontSize: typography.subtitle,
+    fontWeight: "900",
+    lineHeight: typography.lineHeight.subtitle,
+    textTransform: "uppercase",
+  },
+  garageOwner: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
+  garageMetaRow: { flexDirection: "row", gap: spacing.xs, marginTop: spacing.xs },
+  garageMeta: {
+    color: colors.textMuted,
+    fontSize: 9,
+    fontWeight: "800",
+    textTransform: "uppercase",
   },
 });
