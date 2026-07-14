@@ -71,7 +71,7 @@ function ProfileCover({ coverImageUrl, displayName, avatarUrl }: { coverImageUrl
       <Pressable
         accessibilityLabel="Profile settings"
         accessibilityRole="button"
-        onPress={() => router.push('/edit-profile')}
+        onPress={() => router.push('/settings')}
         style={({ pressed }) => [styles.coverAction, pressed && styles.pressed]}>
         <Ionicons name="settings-outline" size={20} color={colors.text} />
       </Pressable>
