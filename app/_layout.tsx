@@ -34,6 +34,9 @@ export default function RootLayout() {
         <Stack.Screen name="event-chat" />
         <Stack.Screen name="event-gallery" />
         <Stack.Screen name="event-summary" />
+        <Stack.Screen name="crew-chat" />
+        <Stack.Screen name="crew-gallery" />
+        <Stack.Screen name="convoy-setup" />
         <Stack.Screen name="post-editor" />
         <Stack.Screen name="post-details" />
       </Stack>

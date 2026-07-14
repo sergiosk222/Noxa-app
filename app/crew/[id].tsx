@@ -469,6 +469,65 @@ function SectionHeading({
   );
 }
 
+function CrewQuickActions({
+  enabled,
+  onChat,
+  onConvoy,
+  onGallery,
+}: {
+  enabled: boolean;
+  onChat: () => void;
+  onConvoy: () => void;
+  onGallery: () => void;
+}) {
+  const actions = [
+    { label: "CHAT", icon: "chatbubbles-outline" as const, onPress: onChat },
+    { label: "GALLERY", icon: "images-outline" as const, onPress: onGallery },
+    { label: "CONVOY", icon: "car-sport-outline" as const, onPress: onConvoy },
+  ];
+
+  return (
+    <View style={styles.sectionBlock}>
+      <SectionHeading
+        caption="Private spaces for the crew"
+        title="QUICK ACTIONS"
+      />
+      <View style={styles.quickActionGrid}>
+        {actions.map((action) => (
+          <Pressable
+            accessibilityLabel={`Open crew ${action.label.toLowerCase()}`}
+            accessibilityRole="button"
+            disabled={!enabled}
+            key={action.label}
+            onPress={action.onPress}
+            style={({ pressed }) => [
+              styles.quickAction,
+              !enabled && styles.quickActionDisabled,
+              pressed && enabled && styles.pressed,
+            ]}
+          >
+            <View style={styles.quickActionIcon}>
+              <Ionicons
+                name={enabled ? action.icon : "lock-closed-outline"}
+                size={21}
+                color={enabled ? colors.primaryHover : colors.textSubtle}
+              />
+            </View>
+            <Text style={[styles.quickActionLabel, !enabled && styles.quickActionLabelDisabled]}>
+              {action.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      {!enabled ? (
+        <Text style={styles.quickActionHint}>
+          Join the crew to unlock Chat, Gallery, and Convoy.
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 function CrewEvents({
   canCreate,
   error,
@@ -1744,6 +1803,18 @@ export default function CrewDetailsScreen() {
               owner={owner}
               vehiclesCount={vehicles.length}
             />
+            <CrewQuickActions
+              enabled={isMember}
+              onChat={() =>
+                router.push({ pathname: "/crew-chat", params: { id: crew.id } })
+              }
+              onConvoy={() =>
+                router.push({ pathname: "/convoy-setup", params: { id: crew.id } })
+              }
+              onGallery={() =>
+                router.push({ pathname: "/crew-gallery", params: { id: crew.id } })
+              }
+            />
             <CrewEvents
               canCreate={canManageCrew}
               error={crewEventsError}
@@ -2043,6 +2114,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   membershipAction: { gap: spacing.sm },
+  quickActionGrid: { flexDirection: "row", gap: spacing.sm },
+  quickAction: {
+    flex: 1,
+    minHeight: 96,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  quickActionDisabled: { opacity: 0.56 },
+  quickActionIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySubtle,
+  },
+  quickActionLabel: {
+    color: colors.text,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+  },
+  quickActionLabelDisabled: { color: colors.textSubtle },
+  quickActionHint: {
+    marginTop: spacing.sm,
+    color: colors.textSubtle,
+    fontSize: 10,
+    lineHeight: 15,
+    textAlign: "center",
+  },
   ownerStatus: {
     minHeight: 52,
     flexDirection: "row",
