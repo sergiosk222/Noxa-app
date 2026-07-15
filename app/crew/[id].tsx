@@ -471,19 +471,28 @@ function SectionHeading({
 
 function CrewQuickActions({
   enabled,
+  onCalendar,
   onChat,
   onConvoy,
   onGallery,
+  onGarage,
+  onPolls,
 }: {
   enabled: boolean;
+  onCalendar: () => void;
   onChat: () => void;
   onConvoy: () => void;
   onGallery: () => void;
+  onGarage: () => void;
+  onPolls: () => void;
 }) {
   const actions = [
     { label: "CHAT", icon: "chatbubbles-outline" as const, onPress: onChat },
     { label: "GALLERY", icon: "images-outline" as const, onPress: onGallery },
-    { label: "CONVOY", icon: "car-sport-outline" as const, onPress: onConvoy },
+    { label: "GARAGE", icon: "car-sport-outline" as const, onPress: onGarage },
+    { label: "CALENDAR", icon: "calendar-outline" as const, onPress: onCalendar },
+    { label: "POLLS", icon: "stats-chart-outline" as const, onPress: onPolls },
+    { label: "CONVOY", icon: "navigate-outline" as const, onPress: onConvoy },
   ];
 
   return (
@@ -521,7 +530,7 @@ function CrewQuickActions({
       </View>
       {!enabled ? (
         <Text style={styles.quickActionHint}>
-          Join the crew to unlock Chat, Gallery, and Convoy.
+          Join the crew to unlock its private tools and shared spaces.
         </Text>
       ) : null}
     </View>
@@ -1805,6 +1814,9 @@ export default function CrewDetailsScreen() {
             />
             <CrewQuickActions
               enabled={isMember}
+              onCalendar={() =>
+                router.push({ pathname: "/crew-calendar", params: { id: crew.id } })
+              }
               onChat={() =>
                 router.push({ pathname: "/crew-chat", params: { id: crew.id } })
               }
@@ -1813,6 +1825,12 @@ export default function CrewDetailsScreen() {
               }
               onGallery={() =>
                 router.push({ pathname: "/crew-gallery", params: { id: crew.id } })
+              }
+              onGarage={() =>
+                router.push({ pathname: "/crew-garage", params: { id: crew.id } })
+              }
+              onPolls={() =>
+                router.push({ pathname: "/crew-polls", params: { id: crew.id } })
               }
             />
             <CrewEvents
@@ -2114,10 +2132,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   membershipAction: { gap: spacing.sm },
-  quickActionGrid: { flexDirection: "row", gap: spacing.sm },
+  quickActionGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   quickAction: {
-    flex: 1,
-    minHeight: 96,
+    width: "30%",
+    flexGrow: 1,
+    minHeight: 88,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,

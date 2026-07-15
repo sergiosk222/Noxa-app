@@ -36,6 +36,9 @@ export default function RootLayout() {
         <Stack.Screen name="event-summary" />
         <Stack.Screen name="crew-chat" />
         <Stack.Screen name="crew-gallery" />
+        <Stack.Screen name="crew-garage" />
+        <Stack.Screen name="crew-calendar" />
+        <Stack.Screen name="crew-polls" />
         <Stack.Screen name="convoy-setup" />
         <Stack.Screen name="post-editor" />
         <Stack.Screen name="post-details" />
