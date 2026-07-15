@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 
 import { NoxaAvatar, NoxaScreen } from '@/src/components/ui';
+import { stopLiveDriveSession } from '@/src/lib/liveDrive';
 import { supabase } from '@/src/lib/supabase';
 import { animations, colors, radius, shadows, spacing, typography } from '@/src/theme';
 
@@ -416,6 +417,7 @@ export default function ProfileScreen() {
     if (isSigningOut) return;
 
     setIsSigningOut(true);
+    await stopLiveDriveSession(true).catch(() => undefined);
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     setIsSigningOut(false);
 

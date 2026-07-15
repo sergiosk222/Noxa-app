@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
+import '@/src/lib/liveDrive';
 import { colors } from '@/src/theme/colors';
 
 const noxaTheme = {

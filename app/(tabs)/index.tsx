@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -22,6 +23,15 @@ import MapView, {
 } from "react-native-maps";
 
 import { NoxaCompactLogo } from "@/src/components/brand";
+import {
+  LIVE_DRIVE_TASK_NAME,
+  getLiveDriveSession,
+  requestLiveDrivePermissions,
+  startLiveDriveSession,
+  stopLiveDriveSession,
+  updateLiveDriveVisibility,
+  type LiveDriveVisibilityMode,
+} from "@/src/lib/liveDrive";
 import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 
@@ -61,6 +71,7 @@ type PresenceLocationPayload = {
   speed_mps: number | null;
   accuracy_meters: number | null;
   visibility_mode: LocationVisibilityMode;
+  share_expires_at: string;
 };
 type RouteResult = {
   coordinates: LatLng[];
@@ -81,7 +92,6 @@ const THESSALONIKI: LatLng = { latitude: 40.6401, longitude: 22.9444 };
 const DEFAULT_DELTA = { latitudeDelta: 0.075, longitudeDelta: 0.075 };
 const ACTIVE_DRIVER_WINDOW_MS = 2 * 60 * 1000;
 const DRIVER_LOCATION_MIN_WRITE_MS = 7000;
-const DRIVER_PRESENCE_HEARTBEAT_MS = 45 * 1000;
 const DRIVER_LIST_REFRESH_MS = 30 * 1000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -263,6 +273,15 @@ function formatEventTime(value: string) {
 
 function normalizeParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function formatLiveDriveRemaining(expiresAt: string | null, nowMs: number) {
+  if (!expiresAt) return null;
+  const remainingMs = Math.max(0, Date.parse(expiresAt) - nowMs);
+  const totalMinutes = Math.ceil(remainingMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 }
 
 function finiteOrNull(value: number | null | undefined) {
@@ -498,10 +517,6 @@ export default function LiveMapScreen() {
   const [routeMessage, setRouteMessage] = useState<string | null>(null);
   const routeRequestKeyRef = useRef<string | null>(null);
   const routeRequestIdRef = useRef(0);
-  const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
-  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-    null,
-  );
   const isMountedRef = useRef(true);
   const isAppForegroundRef = useRef(AppState.currentState === "active");
   const sharingUserIdRef = useRef<string | null>(null);
@@ -516,6 +531,11 @@ export default function LiveMapScreen() {
   const [visibilityMode, setVisibilityMode] =
     useState<LocationVisibilityMode>("ghost");
   const [visibilityMenuOpen, setVisibilityMenuOpen] = useState(false);
+  const [pendingVisibilityMode, setPendingVisibilityMode] =
+    useState<LiveDriveVisibilityMode | null>(null);
+  const [isStartingLiveDrive, setIsStartingLiveDrive] = useState(false);
+  const [liveDriveExpiresAt, setLiveDriveExpiresAt] = useState<string | null>(null);
+  const [liveDriveClock, setLiveDriveClock] = useState(Date.now());
   const [sharingError, setSharingError] = useState<string | null>(null);
   const [activeDrivers, setActiveDrivers] = useState<ActiveDriver[]>([]);
   const [mapFilter, setMapFilter] = useState<MapFilter>("all");
@@ -572,13 +592,6 @@ export default function LiveMapScreen() {
     return point;
   }, []);
 
-  const clearPresenceHeartbeat = useCallback(() => {
-    if (heartbeatIntervalRef.current) {
-      clearInterval(heartbeatIntervalRef.current);
-      heartbeatIntervalRef.current = null;
-    }
-  }, []);
-
   const deletePresence = useCallback(async (userId?: string | null) => {
     const id = userId ?? sharingUserIdRef.current;
     if (!id) return;
@@ -587,9 +600,6 @@ export default function LiveMapScreen() {
 
   const stopSharing = useCallback(
     async (deleteRow = true) => {
-      locationWatcherRef.current?.remove();
-      locationWatcherRef.current = null;
-      clearPresenceHeartbeat();
       lastPresenceWriteRef.current = 0;
       latestPresencePayloadRef.current = null;
       const userId = sharingUserIdRef.current;
@@ -599,13 +609,14 @@ export default function LiveMapScreen() {
         setIsVisibleOnMap(false);
         setVisibilityMode("ghost");
         setVisibilityMenuOpen(false);
+        setPendingVisibilityMode(null);
+        setLiveDriveExpiresAt(null);
         setSharingError(null);
       }
-      if (deleteRow && userId) {
-        await deletePresence(userId).catch(() => undefined);
-      }
+      await stopLiveDriveSession(deleteRow).catch(() => undefined);
+      if (deleteRow && userId) await deletePresence(userId).catch(() => undefined);
     },
-    [clearPresenceHeartbeat, deletePresence],
+    [deletePresence],
   );
 
   const writePresencePayload = useCallback(
@@ -664,6 +675,8 @@ export default function LiveMapScreen() {
         speed_mps: speed !== null && speed >= 0 ? speed : null,
         accuracy_meters: accuracy !== null && accuracy >= 0 ? accuracy : null,
         visibility_mode: visibilityModeRef.current,
+        share_expires_at:
+          getLiveDriveSession()?.expiresAt ?? new Date().toISOString(),
       };
       latestPresencePayloadRef.current = payload;
       void writePresencePayload(userId, payload);
@@ -671,25 +684,10 @@ export default function LiveMapScreen() {
     [writePresencePayload],
   );
 
-  const startPresenceHeartbeat = useCallback(() => {
-    if (heartbeatIntervalRef.current) return;
-    if (
-      !isAppForegroundRef.current ||
-      !sharingUserIdRef.current ||
-      !latestPresencePayloadRef.current
-    )
-      return;
-    heartbeatIntervalRef.current = setInterval(() => {
-      const userId = sharingUserIdRef.current;
-      const payload = latestPresencePayloadRef.current;
-      if (!isAppForegroundRef.current || !userId || !payload) return;
-      void writePresencePayload(userId, payload, true);
-    }, DRIVER_PRESENCE_HEARTBEAT_MS);
-  }, [writePresencePayload]);
-
   const startSharing = useCallback(
-    async (mode: Exclude<LocationVisibilityMode, "ghost">) => {
+    async (mode: LiveDriveVisibilityMode) => {
       setSharingError(null);
+      setIsStartingLiveDrive(true);
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
       if (!userId) {
@@ -697,63 +695,45 @@ export default function LiveMapScreen() {
         setSharingError("Sign in to become visible on the map.");
         setIsVisibleOnMap(false);
         setVisibilityMode("ghost");
-        return;
-      }
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== Location.PermissionStatus.GRANTED) {
-        visibilityModeRef.current = "ghost";
-        setSharingError(
-          "Foreground location permission is needed for temporary visibility.",
-        );
-        setIsVisibleOnMap(false);
-        setVisibilityMode("ghost");
+        setIsStartingLiveDrive(false);
         return;
       }
       try {
+        await requestLiveDrivePermissions();
+        const liveDriveSession = await startLiveDriveSession(userId, mode);
         visibilityModeRef.current = mode;
         sharingUserIdRef.current = userId;
         setVisibilityMode(mode);
+        setLiveDriveExpiresAt(liveDriveSession.expiresAt);
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
         upsertPresence(userId, position.coords);
-        const watcher = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 9000,
-            distanceInterval: 12,
-          },
-          (position) => {
-            if (!isMountedRef.current || sharingUserIdRef.current !== userId)
-              return;
-            upsertPresence(userId, position.coords);
-            startPresenceHeartbeat();
-          },
-        );
-        locationWatcherRef.current = watcher;
-        startPresenceHeartbeat();
         if (isMountedRef.current) setIsVisibleOnMap(true);
-      } catch {
-        locationWatcherRef.current?.remove();
-        locationWatcherRef.current = null;
-        clearPresenceHeartbeat();
+      } catch (error) {
         sharingUserIdRef.current = null;
         visibilityModeRef.current = "ghost";
         latestPresencePayloadRef.current = null;
+        await stopLiveDriveSession(true).catch(() => undefined);
         await deletePresence(userId).catch(() => undefined);
         if (isMountedRef.current) {
           setIsVisibleOnMap(false);
           setVisibilityMode("ghost");
-          setSharingError("Could not start temporary map visibility.");
+          setLiveDriveExpiresAt(null);
+          setSharingError(
+            error instanceof Error
+              ? error.message
+              : "Could not start the 4-hour Live Drive session.",
+          );
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setIsStartingLiveDrive(false);
+          setPendingVisibilityMode(null);
         }
       }
     },
-    [
-      clearPresenceHeartbeat,
-      deletePresence,
-      startPresenceHeartbeat,
-      upsertPresence,
-    ],
+    [deletePresence, upsertPresence],
   );
 
   const changeVisibilityMode = useCallback(
@@ -764,24 +744,63 @@ export default function LiveMapScreen() {
         return;
       }
 
-      const userId = sharingUserIdRef.current;
-      const latestPayload = latestPresencePayloadRef.current;
-      if (!userId || !latestPayload) {
-        await startSharing(mode);
+      const activeSession = getLiveDriveSession();
+      const userId = sharingUserIdRef.current ?? activeSession?.userId;
+      if (!userId || !activeSession) {
+        setPendingVisibilityMode(mode);
         return;
       }
 
       visibilityModeRef.current = mode;
+      const liveDriveSession = await updateLiveDriveVisibility(mode).catch(() => null);
+      if (!liveDriveSession) {
+        await stopSharing(true);
+        setSharingError("Your Live Drive session expired. Start a new 4-hour session.");
+        return;
+      }
       setVisibilityMode(mode);
       setIsVisibleOnMap(true);
+      setLiveDriveExpiresAt(liveDriveSession.expiresAt);
       lastPresenceWriteRef.current = 0;
-      await deletePresence(userId).catch(() => undefined);
-      const nextPayload = { ...latestPayload, visibility_mode: mode };
-      latestPresencePayloadRef.current = nextPayload;
-      await writePresencePayload(userId, nextPayload, true);
+      const latestPayload = latestPresencePayloadRef.current;
+      if (latestPayload) {
+        const nextPayload = { ...latestPayload, visibility_mode: mode };
+        latestPresencePayloadRef.current = nextPayload;
+        await writePresencePayload(userId, nextPayload, true);
+      } else {
+        await supabase
+          .from("driver_locations")
+          .update({ visibility_mode: mode })
+          .eq("user_id", userId);
+      }
     },
-    [deletePresence, startSharing, stopSharing, writePresencePayload],
+    [stopSharing, writePresencePayload],
   );
+
+  const restoreLiveDriveSession = useCallback(async () => {
+    const activeSession = getLiveDriveSession();
+    if (!activeSession) {
+      if (sharingUserIdRef.current) await stopSharing(true);
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.user.id !== activeSession.userId) {
+      await stopSharing(true);
+      return;
+    }
+    if (!(await Location.hasStartedLocationUpdatesAsync(LIVE_DRIVE_TASK_NAME))) {
+      await stopSharing(true);
+      return;
+    }
+    sharingUserIdRef.current = activeSession.userId;
+    visibilityModeRef.current = activeSession.visibilityMode;
+    if (isMountedRef.current) {
+      setVisibilityMode(activeSession.visibilityMode);
+      setLiveDriveExpiresAt(activeSession.expiresAt);
+      setIsVisibleOnMap(true);
+      setLiveDriveClock(Date.now());
+    }
+  }, [stopSharing]);
 
   const loadEvents = useCallback(async () => {
     const { data } = await supabase
@@ -857,6 +876,7 @@ export default function LiveMapScreen() {
   useEffect(() => {
     let isActive = true;
     isMountedRef.current = true;
+    void restoreLiveDriveSession();
     void refreshActiveDrivers();
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -887,32 +907,35 @@ export default function LiveMapScreen() {
       isActive = false;
       isMountedRef.current = false;
       activeDriversRequestIdRef.current += 1;
-      locationWatcherRef.current?.remove();
-      locationWatcherRef.current = null;
-      clearPresenceHeartbeat();
       latestPresencePayloadRef.current = null;
-      const userId = sharingUserIdRef.current;
       sharingUserIdRef.current = null;
-      void deletePresence(userId).catch(() => undefined);
       clearInterval(refreshInterval);
       void supabase.removeChannel(channel);
       authListener.subscription.unsubscribe();
     };
   }, [
-    clearPresenceHeartbeat,
-    deletePresence,
     refreshActiveDrivers,
+    restoreLiveDriveSession,
     stopSharing,
   ]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       isAppForegroundRef.current = nextState === "active";
-      if (nextState === "active") startPresenceHeartbeat();
-      else clearPresenceHeartbeat();
+      if (nextState === "active") void restoreLiveDriveSession();
     });
     return () => subscription.remove();
-  }, [clearPresenceHeartbeat, startPresenceHeartbeat]);
+  }, [restoreLiveDriveSession]);
+
+  useEffect(() => {
+    if (!liveDriveExpiresAt) return;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setLiveDriveClock(now);
+      if (now >= Date.parse(liveDriveExpiresAt)) void stopSharing(true);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [liveDriveExpiresAt, stopSharing]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1072,6 +1095,13 @@ export default function LiveMapScreen() {
   const activeVisibilityMode =
     VISIBILITY_MODES.find((mode) => mode.id === visibilityMode) ??
     VISIBILITY_MODES[VISIBILITY_MODES.length - 1];
+  const liveDriveRemaining = formatLiveDriveRemaining(
+    liveDriveExpiresAt,
+    liveDriveClock,
+  );
+  const pendingVisibility = VISIBILITY_MODES.find(
+    (mode) => mode.id === pendingVisibilityMode,
+  );
   const noticesTop = visibilityTop + (visibilityMenuOpen ? 238 : 42);
   const eventCardBottom =
     insets.bottom + TAB_BAR_BOTTOM_GAP + TAB_BAR_HEIGHT + FLOATING_GAP;
@@ -1224,6 +1254,9 @@ export default function LiveMapScreen() {
             ]}
           >
             {activeVisibilityMode.label}
+            {isVisibleOnMap && liveDriveRemaining
+              ? ` · ${liveDriveRemaining}`
+              : ""}
           </Text>
           <Ionicons
             name={visibilityMenuOpen ? "chevron-up" : "chevron-down"}
@@ -1362,6 +1395,55 @@ export default function LiveMapScreen() {
           />
         ) : null}
       </View>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isStartingLiveDrive) setPendingVisibilityMode(null);
+        }}
+        transparent
+        visible={pendingVisibilityMode !== null}
+      >
+        <View style={styles.liveDriveModalBackdrop}>
+          <View style={styles.liveDriveModalCard}>
+            <View style={styles.liveDriveModalIcon}>
+              <Ionicons name="navigate" size={22} color={colors.primaryHover} />
+            </View>
+            <Text style={styles.liveDriveModalEyebrow}>BACKGROUND LOCATION</Text>
+            <Text style={styles.liveDriveModalTitle}>Start a 4-hour Live Drive?</Text>
+            <Text style={styles.liveDriveModalBody}>
+              NOXA collects and shares your precise location with{' '}
+              {pendingVisibility?.label.toLowerCase() ?? 'your selected audience'} while
+              the app is in the background, so they can see you on the live map.
+            </Text>
+            <Text style={styles.liveDriveModalFootnote}>
+              Sharing stops after 4 hours, when you select Ghost, or when you sign out.
+            </Text>
+            <View style={styles.liveDriveModalActions}>
+              <TouchableOpacity
+                disabled={isStartingLiveDrive}
+                onPress={() => setPendingVisibilityMode(null)}
+                style={styles.liveDriveCancelButton}
+              >
+                <Text style={styles.liveDriveCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={isStartingLiveDrive || !pendingVisibilityMode}
+                onPress={() => {
+                  if (pendingVisibilityMode) void startSharing(pendingVisibilityMode);
+                }}
+                style={styles.liveDriveStartButton}
+              >
+                {isStartingLiveDrive ? (
+                  <ActivityIndicator color={colors.text} size="small" />
+                ) : (
+                  <Text style={styles.liveDriveStartText}>START 4-HOUR SESSION</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1606,6 +1688,87 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     textAlign: "center",
+  },
+  liveDriveModalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    padding: spacing.xl,
+    backgroundColor: "rgba(4,4,7,0.78)",
+  },
+  liveDriveModalCard: {
+    padding: spacing.xl,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    ...shadows.card,
+  },
+  liveDriveModalIcon: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySubtle,
+  },
+  liveDriveModalEyebrow: {
+    marginBottom: spacing.xs,
+    color: colors.primaryHover,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+  },
+  liveDriveModalTitle: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  liveDriveModalBody: {
+    marginTop: spacing.md,
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  liveDriveModalFootnote: {
+    marginTop: spacing.sm,
+    color: colors.textSubtle,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  liveDriveModalActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+  },
+  liveDriveCancelButton: {
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  liveDriveCancelText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  liveDriveStartButton: {
+    flex: 1,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+  },
+  liveDriveStartText: {
+    color: colors.text,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 0.7,
   },
   nearbySummary: {
     position: "absolute",

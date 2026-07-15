@@ -9,11 +9,13 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.karaketidis.noxa"
     },
     "android": {
+      "package": "com.karaketidis.noxa",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#C8102E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -34,6 +36,16 @@
           "dark": {
             "backgroundColor": "#080A0F"
           }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "NOXA uses your precise location to place you on the live map while the app is open.",
+          "locationAlwaysAndWhenInUsePermission": "NOXA uses your precise location during a 4-hour Live Drive session, including in the background, so the audience you choose can see you on the live map.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ]
     ],

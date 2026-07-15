@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,8 +15,11 @@ import {
 } from 'react-native';
 
 import { NoxaAvatar, NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { stopLiveDriveSession } from '@/src/lib/liveDrive';
 import { supabase } from '@/src/lib/supabase';
 import { colors, radius, shadows, spacing, typography } from '@/src/theme';
+
+const SUPPORT_EMAIL = 'noxastreetapp@gmail.com';
 
 type SettingsProfile = {
   id: string;
@@ -171,6 +175,7 @@ export default function SettingsScreen() {
     if (isSigningOut) return;
     setIsSigningOut(true);
 
+    await stopLiveDriveSession(true).catch(() => undefined);
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     setIsSigningOut(false);
 
@@ -187,6 +192,15 @@ export default function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: () => void signOut() },
     ]);
+  };
+
+  const contactSupport = async () => {
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('NOXA Support')}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Email unavailable', `Contact us at ${SUPPORT_EMAIL}.`);
+    }
   };
 
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
@@ -314,6 +328,12 @@ export default function SettingsScreen() {
                   onPress={() => router.push('/(tabs)')}
                 />
                 <SettingsRow
+                  caption={SUPPORT_EMAIL}
+                  icon="mail-outline"
+                  label="Contact NOXA"
+                  onPress={() => void contactSupport()}
+                />
+                <SettingsRow
                   icon="information-circle-outline"
                   isLast
                   label="App Version"
@@ -340,6 +360,11 @@ export default function SettingsScreen() {
                   <Text style={styles.signInText}>SIGN IN TO NOXA</Text>
                 </Pressable>
               )}
+
+              <View accessible accessibilityLabel="NOXA, crafted by KARAKETIDIS" style={styles.signature}>
+                <Text style={styles.signatureBrand}>NOXA</Text>
+                <Text style={styles.signatureCredit}>CRAFTED BY KARAKETIDIS</Text>
+              </View>
             </>
           )}
         </ScrollView>
@@ -459,4 +484,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   signInText: { color: colors.text, fontSize: 12, fontWeight: '900', letterSpacing: 0.8 },
+  signature: { alignItems: 'center', gap: 3, paddingTop: spacing.xs },
+  signatureBrand: {
+    color: colors.textSubtle,
+    fontFamily: typography.fontFamily.display,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 2.4,
+  },
+  signatureCredit: {
+    color: colors.textSubtle,
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    opacity: 0.66,
+  },
 });
