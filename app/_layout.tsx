@@ -1,9 +1,15 @@
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
 import { colors } from '@/src/theme/colors';
+
+SplashScreen.setOptions({
+  duration: 350,
+  fade: true,
+});
 
 const noxaTheme = {
   ...DarkTheme,
