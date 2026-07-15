@@ -32,6 +32,32 @@ function getSignInErrorMessage(message?: string) {
 }
 
 export default function SignInScreen() {
+  return (
+    <NoxaAuthScreen
+      footer={
+        <View style={styles.footer}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/sign-up')} style={styles.switchButton}>
+            <Text style={styles.switchText}>
+              Don&apos;t have an account? <Text style={styles.switchLink}>Sign Up</Text>
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/forgot-password')}
+            style={styles.forgotButton}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </Pressable>
+        </View>
+      }
+      onBack={() => router.back()}
+      subtitle="Sign in to continue your journey."
+      title="Welcome back.">
+      <SignInForm />
+    </NoxaAuthScreen>
+  );
+}
+
+function SignInForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -92,69 +118,49 @@ export default function SignInScreen() {
   };
 
   return (
-    <NoxaAuthScreen
-      footer={
-        <View style={styles.footer}>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/sign-up')} style={styles.switchButton}>
-            <Text style={styles.switchText}>
-              Don&apos;t have an account? <Text style={styles.switchLink}>Sign Up</Text>
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/forgot-password')}
-            style={styles.forgotButton}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </Pressable>
-        </View>
-      }
-      onBack={() => router.back()}
-      subtitle="Sign in to continue your journey."
-      title="Welcome back.">
-      <View style={styles.form}>
-        <NoxaAuthField
-          autoCapitalize="none"
-          autoComplete="email"
-          editable={!isLoading}
-          error={errors.email}
-          inputMode="email"
-          keyboardType="email-address"
-          label="Email"
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          returnKeyType="next"
-          textContentType="emailAddress"
-          value={email}
-        />
-        <NoxaAuthField
-          autoCapitalize="none"
-          autoComplete="password"
-          editable={!isLoading}
-          error={errors.password}
-          label="Password"
-          onChangeText={setPassword}
-          onTogglePassword={() => setShowPassword((current) => !current)}
-          passwordVisible={showPassword}
-          placeholder="••••••••"
-          returnKeyType="done"
-          secureTextEntry={!showPassword}
-          textContentType="password"
-          value={password}
-        />
+    <View style={styles.form}>
+      <NoxaAuthField
+        autoCapitalize="none"
+        autoComplete="email"
+        editable={!isLoading}
+        error={errors.email}
+        inputMode="email"
+        keyboardType="email-address"
+        label="Email"
+        onChangeText={setEmail}
+        placeholder="you@example.com"
+        returnKeyType="next"
+        textContentType="emailAddress"
+        value={email}
+      />
+      <NoxaAuthField
+        autoCapitalize="none"
+        autoComplete="password"
+        editable={!isLoading}
+        error={errors.password}
+        label="Password"
+        onChangeText={setPassword}
+        onTogglePassword={() => setShowPassword((current) => !current)}
+        passwordVisible={showPassword}
+        placeholder="••••••••"
+        returnKeyType="done"
+        secureTextEntry={!showPassword}
+        textContentType="password"
+        value={password}
+      />
 
-        {errors.form ? <Text style={styles.formError}>{errors.form}</Text> : null}
+      {errors.form ? <Text style={styles.formError}>{errors.form}</Text> : null}
 
-        <View style={styles.submit}>
-          <NoxaButton
-            disabled={isLoading}
-            fullWidth
-            loading={isLoading}
-            onPress={handleSignIn}
-            title="Sign In"
-          />
-        </View>
+      <View style={styles.submit}>
+        <NoxaButton
+          disabled={isLoading}
+          fullWidth
+          loading={isLoading}
+          onPress={handleSignIn}
+          title="Sign In"
+        />
       </View>
-    </NoxaAuthScreen>
+    </View>
   );
 }
 

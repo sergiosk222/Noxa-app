@@ -10,6 +10,7 @@ import { colors, spacing, typography } from '@/src/theme';
 
 const AUTH_HERO_IMAGE =
   'https://images.unsplash.com/photo-1771726588790-7db55012b68a?w=800&h=600&fit=crop&auto=format';
+const AUTH_HERO_SOURCE = { uri: AUTH_HERO_IMAGE };
 
 type NoxaAuthScreenProps = {
   children: ReactNode;
@@ -27,7 +28,7 @@ export function NoxaAuthScreen({ children, footer, onBack, subtitle, title }: No
       <Image
         cachePolicy="memory-disk"
         contentFit="cover"
-        source={{ uri: AUTH_HERO_IMAGE }}
+        source={AUTH_HERO_SOURCE}
         style={styles.heroImage}
         transition={220}
       />
@@ -51,6 +52,7 @@ export function NoxaAuthScreen({ children, footer, onBack, subtitle, title }: No
               paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.lg,
             },
           ]}
+          keyboardDismissMode="none"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.header}>

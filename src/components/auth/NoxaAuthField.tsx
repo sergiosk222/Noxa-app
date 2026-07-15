@@ -29,6 +29,7 @@ export function NoxaAuthField({
       <Text style={styles.label}>{label}</Text>
       <View style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}>
         <TextInput
+          {...props}
           accessibilityLabel={label}
           onBlur={(event) => {
             setFocused(false);
@@ -41,7 +42,6 @@ export function NoxaAuthField({
           placeholderTextColor={colors.textSubtle}
           selectionColor={colors.primary}
           style={[styles.input, onTogglePassword && styles.inputWithAction, style]}
-          {...props}
         />
         {onTogglePassword ? (
           <Pressable

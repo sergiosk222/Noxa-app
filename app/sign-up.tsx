@@ -18,6 +18,24 @@ type SignUpErrors = {
 const emailPattern = /^\S+@\S+\.\S+$/;
 
 export default function SignUpScreen() {
+  return (
+    <NoxaAuthScreen
+      footer={
+        <Pressable accessibilityRole="button" onPress={() => router.push('/sign-in')} style={styles.switchButton}>
+          <Text style={styles.switchText}>
+            Already have an account? <Text style={styles.switchLink}>Sign In</Text>
+          </Text>
+        </Pressable>
+      }
+      onBack={() => router.back()}
+      subtitle="Start your automotive journey today."
+      title="Join NOXA.">
+      <SignUpForm />
+    </NoxaAuthScreen>
+  );
+}
+
+function SignUpForm() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -97,88 +115,76 @@ export default function SignUpScreen() {
   };
 
   return (
-    <NoxaAuthScreen
-      footer={
-        <Pressable accessibilityRole="button" onPress={() => router.push('/sign-in')} style={styles.switchButton}>
-          <Text style={styles.switchText}>
-            Already have an account? <Text style={styles.switchLink}>Sign In</Text>
-          </Text>
-        </Pressable>
-      }
-      onBack={() => router.back()}
-      subtitle="Start your automotive journey today."
-      title="Join NOXA.">
-      <View style={styles.form}>
-        <NoxaAuthField
-          editable={!isSubmitting}
-          error={errors.displayName}
-          label="Full Name"
-          onChangeText={setDisplayName}
-          placeholder="Matteo Romano"
-          returnKeyType="next"
-          textContentType="name"
-          value={displayName}
-        />
-        <NoxaAuthField
-          autoCapitalize="none"
-          autoComplete="email"
-          editable={!isSubmitting}
-          error={errors.email}
-          inputMode="email"
-          keyboardType="email-address"
-          label="Email"
-          onChangeText={setEmail}
-          placeholder="you@example.com"
-          returnKeyType="next"
-          textContentType="emailAddress"
-          value={email}
-        />
-        <NoxaAuthField
-          autoCapitalize="none"
-          autoComplete="new-password"
-          editable={!isSubmitting}
-          error={errors.password}
-          label="Password"
-          onChangeText={setPassword}
-          onTogglePassword={() => setShowPassword((current) => !current)}
-          passwordVisible={showPassword}
-          placeholder="••••••••"
-          returnKeyType="next"
-          secureTextEntry={!showPassword}
-          textContentType="newPassword"
-          value={password}
-        />
-        <NoxaAuthField
-          autoCapitalize="none"
-          autoComplete="new-password"
-          editable={!isSubmitting}
-          error={errors.confirmPassword}
-          label="Confirm Password"
-          onChangeText={setConfirmPassword}
-          onTogglePassword={() => setShowPassword((current) => !current)}
-          passwordVisible={showPassword}
-          placeholder="••••••••"
-          returnKeyType="done"
-          secureTextEntry={!showPassword}
-          textContentType="newPassword"
-          value={confirmPassword}
-        />
+    <View style={styles.form}>
+      <NoxaAuthField
+        editable={!isSubmitting}
+        error={errors.displayName}
+        label="Full Name"
+        onChangeText={setDisplayName}
+        placeholder="Matteo Romano"
+        returnKeyType="next"
+        textContentType="name"
+        value={displayName}
+      />
+      <NoxaAuthField
+        autoCapitalize="none"
+        autoComplete="email"
+        editable={!isSubmitting}
+        error={errors.email}
+        inputMode="email"
+        keyboardType="email-address"
+        label="Email"
+        onChangeText={setEmail}
+        placeholder="you@example.com"
+        returnKeyType="next"
+        textContentType="emailAddress"
+        value={email}
+      />
+      <NoxaAuthField
+        autoCapitalize="none"
+        autoComplete="new-password"
+        editable={!isSubmitting}
+        error={errors.password}
+        label="Password"
+        onChangeText={setPassword}
+        onTogglePassword={() => setShowPassword((current) => !current)}
+        passwordVisible={showPassword}
+        placeholder="••••••••"
+        returnKeyType="next"
+        secureTextEntry={!showPassword}
+        textContentType="newPassword"
+        value={password}
+      />
+      <NoxaAuthField
+        autoCapitalize="none"
+        autoComplete="new-password"
+        editable={!isSubmitting}
+        error={errors.confirmPassword}
+        label="Confirm Password"
+        onChangeText={setConfirmPassword}
+        onTogglePassword={() => setShowPassword((current) => !current)}
+        passwordVisible={showPassword}
+        placeholder="••••••••"
+        returnKeyType="done"
+        secureTextEntry={!showPassword}
+        textContentType="newPassword"
+        value={confirmPassword}
+      />
 
-        <Text style={styles.agreement}>By creating an account, you agree to NOXA Terms and Privacy.</Text>
-        {errors.submit ? <Text style={styles.error}>{errors.submit}</Text> : null}
-        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+      <Text style={styles.agreement}>By creating an account, you agree to NOXA Terms and Privacy.</Text>
+      {errors.submit ? <Text style={styles.error}>{errors.submit}</Text> : null}
+      {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
-        <View style={styles.submit}>
-          <NoxaButton
-            disabled={isSubmitting}
-            fullWidth
-            loading={isSubmitting}
-            onPress={handleCreateAccount}
-            title="Create Account"
-          />
-        </View>
+      <View style={styles.submit}>
+        <NoxaButton
+          disabled={isSubmitting}
+          fullWidth
+          loading={isSubmitting}
+          onPress={handleCreateAccount}
+          title="Create Account"
+        />
       </View>
-    </NoxaAuthScreen>
+    </View>
   );
 }
 
