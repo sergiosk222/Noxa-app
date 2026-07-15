@@ -171,7 +171,23 @@ function SignUpForm() {
         value={confirmPassword}
       />
 
-      <Text style={styles.agreement}>By creating an account, you agree to NOXA Terms and Privacy.</Text>
+      <Text style={styles.agreement}>
+        By creating an account, you confirm you are at least 16 and agree to the NOXA{' '}
+        <Text
+          accessibilityRole="link"
+          onPress={() => router.push('/terms-of-service')}
+          style={styles.agreementLink}>
+          Terms of Service
+        </Text>{' '}
+        and{' '}
+        <Text
+          accessibilityRole="link"
+          onPress={() => router.push('/privacy-policy')}
+          style={styles.agreementLink}>
+          Privacy Policy
+        </Text>
+        .
+      </Text>
       {errors.submit ? <Text style={styles.error}>{errors.submit}</Text> : null}
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
@@ -197,6 +213,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily.body,
     fontSize: 11,
     lineHeight: 17,
+  },
+  agreementLink: {
+    color: colors.primaryHover,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   error: {
     color: colors.primaryHover,

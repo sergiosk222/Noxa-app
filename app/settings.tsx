@@ -15,11 +15,10 @@ import {
 } from 'react-native';
 
 import { NoxaAvatar, NoxaHeader, NoxaScreen } from '@/src/components/ui';
+import { SUPPORT_EMAIL } from '@/src/legal/legalDocuments';
 import { stopLiveDriveSession } from '@/src/lib/liveDrive';
 import { supabase } from '@/src/lib/supabase';
 import { colors, radius, shadows, spacing, typography } from '@/src/theme';
-
-const SUPPORT_EMAIL = 'noxastreetapp@gmail.com';
 
 type SettingsProfile = {
   id: string;
@@ -338,6 +337,22 @@ export default function SettingsScreen() {
                   isLast
                   label="App Version"
                   value={appVersion}
+                />
+              </SettingsGroup>
+
+              <SettingsGroup label="LEGAL">
+                <SettingsRow
+                  caption="How NOXA handles your data"
+                  icon="shield-checkmark-outline"
+                  label="Privacy Policy"
+                  onPress={() => router.push('/privacy-policy')}
+                />
+                <SettingsRow
+                  caption="The rules for using NOXA"
+                  icon="document-text-outline"
+                  isLast
+                  label="Terms of Service"
+                  onPress={() => router.push('/terms-of-service')}
                 />
               </SettingsGroup>
 
