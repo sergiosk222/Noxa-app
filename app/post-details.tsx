@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  type AlertButton,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -17,7 +18,9 @@ import {
   View,
 } from "react-native";
 
+import { ReportModal } from "@/src/components/moderation/ReportModal";
 import { NoxaButton, NoxaScreen } from "@/src/components/ui";
+import { blockUser, type ReportTargetType } from "@/src/lib/moderation";
 import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 
@@ -54,6 +57,12 @@ type CommentViewModel = CommentRow & {
   replyTo: Profile | null;
   likeCount: number;
   likedByMe: boolean;
+};
+
+type ReportTarget = {
+  id: string;
+  label: string;
+  type: Extract<ReportTargetType, "post" | "comment">;
 };
 
 const postImagesBucket = "post-images";
@@ -156,6 +165,8 @@ export default function PostDetailsScreen() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
 
   const isAuthor = useMemo(
     () => Boolean(post && currentUserId === post.author_id),
@@ -479,6 +490,98 @@ export default function PostDetailsScreen() {
     ]);
   }, [currentUserId, deleting, isAuthor, post]);
 
+  const confirmBlockDriver = useCallback(
+    (driverId: string, name: string) => {
+      if (!currentUserId || driverId === currentUserId || blockingUserId) return;
+      Alert.alert(
+        `Block ${name}?`,
+        "You will no longer see each other's profiles, content, follows, or Live Drive location. Existing follows will be removed.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Block",
+            style: "destructive",
+            onPress: async () => {
+              setBlockingUserId(driverId);
+              try {
+                await blockUser(driverId);
+                Alert.alert("Driver blocked", `${name} is now hidden from your NOXA account.`, [
+                  { text: "OK", onPress: () => router.back() },
+                ]);
+              } catch (blockError) {
+                Alert.alert(
+                  "Block failed",
+                  blockError instanceof Error ? blockError.message : "Please try again.",
+                );
+              } finally {
+                setBlockingUserId(null);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [blockingUserId, currentUserId],
+  );
+
+  const openPostActions = useCallback(() => {
+    if (!post) return;
+    if (isAuthor) {
+      confirmDeletePost();
+      return;
+    }
+
+    const buttons: AlertButton[] = [
+      {
+        text: "Report Post",
+        onPress: () => setReportTarget({ id: post.id, label: "post", type: "post" }),
+      },
+    ];
+    if (currentUserId && post.author_id !== currentUserId) {
+      buttons.push({
+        text: "Block Driver",
+        style: "destructive",
+        onPress: () => confirmBlockDriver(post.author_id, profileName(author)),
+      });
+    }
+    buttons.push({ text: "Cancel", style: "cancel" });
+    Alert.alert("Post actions", "Choose a safety action for this post.", buttons);
+  }, [author, confirmBlockDriver, confirmDeletePost, currentUserId, isAuthor, post]);
+
+  const openCommentActions = useCallback(
+    (comment: CommentViewModel) => {
+      if (!currentUserId) return;
+      if (comment.author_id === currentUserId) {
+        confirmDeleteComment(comment);
+        return;
+      }
+
+      const name = profileName(comment.author);
+      const buttons: AlertButton[] = [
+        {
+          text: "Report Comment",
+          onPress: () =>
+            setReportTarget({ id: comment.id, label: "comment", type: "comment" }),
+        },
+        {
+          text: "Block Driver",
+          style: "destructive",
+          onPress: () => confirmBlockDriver(comment.author_id, name),
+        },
+      ];
+      if (isAuthor) {
+        buttons.push({
+          text: "Delete Comment",
+          style: "destructive",
+          onPress: () => confirmDeleteComment(comment),
+        });
+      }
+      buttons.push({ text: "Cancel", style: "cancel" });
+      Alert.alert("Comment actions", "Choose an action for this comment.", buttons);
+    },
+    [confirmBlockDriver, confirmDeleteComment, currentUserId, isAuthor],
+  );
+
   return (
     <NoxaScreen padded={false}>
       <KeyboardAvoidingView
@@ -494,11 +597,11 @@ export default function PostDetailsScreen() {
               label="Share post"
               onPress={() => void sharePost()}
             />
-            {isAuthor ? (
+            {post ? (
               <HeaderButton
-                icon="ellipsis-horizontal"
+                icon={blockingUserId ? "hourglass-outline" : "ellipsis-horizontal"}
                 label="Post actions"
-                onPress={confirmDeletePost}
+                onPress={openPostActions}
               />
             ) : null}
           </View>
@@ -592,7 +695,7 @@ export default function PostDetailsScreen() {
                         comment={comment}
                         index={index}
                         key={comment.id}
-                        onDelete={() => confirmDeleteComment(comment)}
+                        onDelete={() => openCommentActions(comment)}
                         onLike={() => void toggleCommentLike(comment)}
                         onOpenProfile={() =>
                           router.push({
@@ -669,6 +772,13 @@ export default function PostDetailsScreen() {
           </View>
         ) : null}
       </KeyboardAvoidingView>
+      <ReportModal
+        onClose={() => setReportTarget(null)}
+        targetId={reportTarget?.id ?? null}
+        targetLabel={reportTarget?.label ?? "content"}
+        targetType={reportTarget?.type ?? "post"}
+        visible={Boolean(reportTarget)}
+      />
     </NoxaScreen>
   );
 }

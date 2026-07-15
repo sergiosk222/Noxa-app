@@ -93,7 +93,7 @@ export const privacyPolicy: LegalDocument = {
       paragraphs: [
         'Account, profile, and user content are generally retained while your account is active or as needed to provide NOXA. Content you delete is removed from active product views, subject to technical backup cycles and legal requirements.',
         'Live Drive sharing expires after no more than four hours. The active location row is designed to be deleted when you choose Ghost, sign out, or the session cleanup completes. Expired location data is not visible to other users and may remain protected until later cleanup if a device is offline.',
-        'Verified account-deletion requests are normally completed within 30 days. We delete or de-identify account data and user-generated content from active systems unless limited retention is required for security, fraud prevention, dispute resolution, or law. Residual copies may remain temporarily in protected backups until their normal expiry.',
+        'Account deletion started in Settings is designed to remove the authentication account, associated database records, and owned uploads from active systems immediately after password verification. Verified deletion requests sent to support are normally completed within 30 days. Limited records may be retained for security, fraud prevention, dispute resolution, or law, and residual copies may remain temporarily in protected backups until their normal expiry.',
       ],
     },
     {
@@ -106,7 +106,7 @@ export const privacyPolicy: LegalDocument = {
         'Complain to the Hellenic Data Protection Authority or another competent EEA supervisory authority.',
       ],
       paragraphs: [
-        'Send a request from the email address connected to your NOXA account to noxastreetapp@gmail.com. We may ask for limited information to verify that the request belongs to you.',
+        'To delete your account in the app, open Settings, Privacy & Safety, then Delete Account and complete the identity check. For other privacy rights, or if in-app deletion is unavailable, send a request from the email address connected to your NOXA account to noxastreetapp@gmail.com. We may ask for limited information to verify that the request belongs to you.',
       ],
     },
     {
@@ -200,7 +200,7 @@ export const termsOfService: LegalDocument = {
       title: '9. Moderation and reports',
       paragraphs: [
         'We may review, restrict, remove, or preserve content and may warn, suspend, or terminate accounts when reasonably necessary to enforce these terms, protect users, investigate reports, or comply with law. We are not required to monitor every interaction.',
-        'Until dedicated in-app reporting tools are available, report harmful content, safety concerns, or intellectual-property issues to noxastreetapp@gmail.com with enough detail to identify the relevant account or content.',
+        'Use the safety actions on a driver profile, post, or comment to submit a private report or block another user. You can review blocked users in Settings under Privacy & Safety. For urgent safety concerns or intellectual-property issues, contact noxastreetapp@gmail.com with enough detail to identify the relevant account or content.',
       ],
     },
     {
@@ -224,7 +224,7 @@ export const termsOfService: LegalDocument = {
     {
       title: '13. Suspension, termination, and deletion',
       paragraphs: [
-        'You may stop using NOXA at any time and request deletion of your account. We may suspend or terminate access for serious or repeated violations, security risk, legal requirement, or conduct that puts people or the service at risk. Where appropriate, we will provide notice or a way to ask for review.',
+        'You may stop using NOXA at any time and delete your account from Settings under Privacy & Safety, or request deletion from support if the in-app flow is unavailable. We may suspend or terminate access for serious or repeated violations, security risk, legal requirement, or conduct that puts people or the service at risk. Where appropriate, we will provide notice or a way to ask for review.',
         'Account deletion removes the account and associated personal data from active systems as described in the Privacy Policy, subject to verification, backup cycles, and lawful retention.',
       ],
     },

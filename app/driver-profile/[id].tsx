@@ -12,7 +12,9 @@ import {
   View,
 } from "react-native";
 
+import { ReportModal } from "@/src/components/moderation/ReportModal";
 import { NoxaButton, NoxaScreen } from "@/src/components/ui";
+import { blockUser } from "@/src/lib/moderation";
 import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 
@@ -124,6 +126,8 @@ export default function PublicDriverProfileScreen() {
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
 
   const loadDriverProfile = useCallback(async () => {
     if (!isValidDriverId) {
@@ -316,6 +320,48 @@ export default function PublicDriverProfileScreen() {
     refreshFollowDetails,
   ]);
 
+  const confirmBlock = useCallback(() => {
+    if (!profile || !currentUserId || currentUserId === profile.id || isBlocking) return;
+    const name = profile.display_name?.trim() || "this driver";
+
+    Alert.alert(
+      `Block ${name}?`,
+      "You will no longer see each other's profiles, content, follows, or Live Drive location. Existing follows will be removed.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Block",
+          style: "destructive",
+          onPress: async () => {
+            setIsBlocking(true);
+            try {
+              await blockUser(profile.id);
+              Alert.alert("Driver blocked", `${name} is now hidden from your NOXA account.`, [
+                { text: "OK", onPress: () => router.back() },
+              ]);
+            } catch (blockError) {
+              Alert.alert(
+                "Block failed",
+                blockError instanceof Error ? blockError.message : "Please try again.",
+              );
+            } finally {
+              setIsBlocking(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [currentUserId, isBlocking, profile]);
+
+  const openSafetyActions = useCallback(() => {
+    if (!profile || !currentUserId || currentUserId === profile.id) return;
+    Alert.alert("Driver actions", "Choose a safety action for this profile.", [
+      { text: "Report User", onPress: () => setReportVisible(true) },
+      { text: "Block User", style: "destructive", onPress: confirmBlock },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }, [confirmBlock, currentUserId, profile]);
+
   const displayName = profile?.display_name?.trim() || "NOXA Driver";
   const username = profile?.username ? `@${profile.username}` : null;
   const canFollow = Boolean(
@@ -344,7 +390,15 @@ export default function PublicDriverProfileScreen() {
             onPress={() => router.back()}
           />
           <Text style={styles.headerTitle}>DRIVER PROFILE</Text>
-          <View style={styles.headerSpacer} />
+          {canFollow ? (
+            <HeaderAction
+              icon={isBlocking ? "hourglass-outline" : "ellipsis-horizontal"}
+              label="Driver safety actions"
+              onPress={isBlocking ? undefined : openSafetyActions}
+            />
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
 
         {isLoading ? (
@@ -650,6 +704,13 @@ export default function PublicDriverProfileScreen() {
           </>
         )}
       </ScrollView>
+      <ReportModal
+        onClose={() => setReportVisible(false)}
+        targetId={profile?.id ?? null}
+        targetLabel="driver"
+        targetType="profile"
+        visible={reportVisible}
+      />
     </NoxaScreen>
   );
 }

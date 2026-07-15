@@ -340,7 +340,13 @@ export default function SettingsScreen() {
                 />
               </SettingsGroup>
 
-              <SettingsGroup label="LEGAL">
+              <SettingsGroup label="PRIVACY & SAFETY">
+                <SettingsRow
+                  caption="Review people hidden from your account"
+                  icon="ban-outline"
+                  label="Blocked Users"
+                  onPress={profile ? () => router.push('/blocked-users') : undefined}
+                />
                 <SettingsRow
                   caption="How NOXA handles your data"
                   icon="shield-checkmark-outline"
@@ -350,9 +356,16 @@ export default function SettingsScreen() {
                 <SettingsRow
                   caption="The rules for using NOXA"
                   icon="document-text-outline"
-                  isLast
                   label="Terms of Service"
                   onPress={() => router.push('/terms-of-service')}
+                />
+                <SettingsRow
+                  caption="Permanently remove your account and data"
+                  destructive
+                  icon="trash-outline"
+                  isLast
+                  label="Delete Account"
+                  onPress={profile ? () => router.push('/delete-account') : undefined}
                 />
               </SettingsGroup>
 

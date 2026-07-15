@@ -28,6 +28,8 @@ export default function RootLayout() {
         <Stack.Screen name="reset-password" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="blocked-users" />
+        <Stack.Screen name="delete-account" />
         <Stack.Screen name="privacy-policy" />
         <Stack.Screen name="terms-of-service" />
         <Stack.Screen name="search" />
