@@ -60,6 +60,7 @@ type PresenceLocationPayload = {
   heading: number | null;
   speed_mps: number | null;
   accuracy_meters: number | null;
+  visibility_mode: LocationVisibilityMode;
 };
 type RouteResult = {
   coordinates: LatLng[];
@@ -68,6 +69,7 @@ type RouteResult = {
 };
 type RouteStatus = "idle" | "loading" | "ready" | "error";
 type MapFilter = "all" | "drivers" | "events";
+type LocationVisibilityMode = "crew" | "friends" | "global" | "ghost";
 
 type ActionButtonProps = {
   icon: keyof typeof Ionicons.glyphMap;
@@ -80,6 +82,7 @@ const DEFAULT_DELTA = { latitudeDelta: 0.075, longitudeDelta: 0.075 };
 const ACTIVE_DRIVER_WINDOW_MS = 2 * 60 * 1000;
 const DRIVER_LOCATION_MIN_WRITE_MS = 7000;
 const DRIVER_PRESENCE_HEARTBEAT_MS = 45 * 1000;
+const DRIVER_LIST_REFRESH_MS = 30 * 1000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let driverLocationsMapChannelSequence = 0;
@@ -91,6 +94,37 @@ const MAP_FILTERS: { id: MapFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "drivers", label: "Drivers" },
   { id: "events", label: "Events" },
+];
+const VISIBILITY_MODES: {
+  id: LocationVisibilityMode;
+  label: string;
+  description: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  {
+    id: "crew",
+    label: "Crew",
+    description: "Visible to drivers in your crews",
+    icon: "people-outline",
+  },
+  {
+    id: "friends",
+    label: "Friends",
+    description: "Visible to mutual followers",
+    icon: "person-add-outline",
+  },
+  {
+    id: "global",
+    label: "Global",
+    description: "Visible to everyone on NOXA",
+    icon: "earth-outline",
+  },
+  {
+    id: "ghost",
+    label: "Ghost",
+    description: "Location sharing is off",
+    icon: "eye-off-outline",
+  },
 ];
 
 const androidNoxaMapStyle = [
@@ -471,6 +505,7 @@ export default function LiveMapScreen() {
   const isMountedRef = useRef(true);
   const isAppForegroundRef = useRef(AppState.currentState === "active");
   const sharingUserIdRef = useRef<string | null>(null);
+  const visibilityModeRef = useRef<LocationVisibilityMode>("ghost");
   const latestPresencePayloadRef = useRef<PresenceLocationPayload | null>(null);
   const lastPresenceWriteRef = useRef(0);
   const presenceWriteQueueRef = useRef(Promise.resolve());
@@ -478,6 +513,9 @@ export default function LiveMapScreen() {
   const activeDriversRefreshInFlightRef = useRef(false);
   const activeDriversRefreshQueuedRef = useRef(false);
   const [isVisibleOnMap, setIsVisibleOnMap] = useState(false);
+  const [visibilityMode, setVisibilityMode] =
+    useState<LocationVisibilityMode>("ghost");
+  const [visibilityMenuOpen, setVisibilityMenuOpen] = useState(false);
   const [sharingError, setSharingError] = useState<string | null>(null);
   const [activeDrivers, setActiveDrivers] = useState<ActiveDriver[]>([]);
   const [mapFilter, setMapFilter] = useState<MapFilter>("all");
@@ -556,8 +594,11 @@ export default function LiveMapScreen() {
       latestPresencePayloadRef.current = null;
       const userId = sharingUserIdRef.current;
       sharingUserIdRef.current = null;
+      visibilityModeRef.current = "ghost";
       if (isMountedRef.current) {
         setIsVisibleOnMap(false);
+        setVisibilityMode("ghost");
+        setVisibilityMenuOpen(false);
         setSharingError(null);
       }
       if (deleteRow && userId) {
@@ -622,6 +663,7 @@ export default function LiveMapScreen() {
           heading !== null && heading >= 0 && heading < 360 ? heading : null,
         speed_mps: speed !== null && speed >= 0 ? speed : null,
         accuracy_meters: accuracy !== null && accuracy >= 0 ? accuracy : null,
+        visibility_mode: visibilityModeRef.current,
       };
       latestPresencePayloadRef.current = payload;
       void writePresencePayload(userId, payload);
@@ -645,55 +687,100 @@ export default function LiveMapScreen() {
     }, DRIVER_PRESENCE_HEARTBEAT_MS);
   }, [writePresencePayload]);
 
-  const startSharing = useCallback(async () => {
-    setSharingError(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    if (!userId) {
-      setSharingError("Sign in to become visible on the map.");
-      setIsVisibleOnMap(false);
-      return;
-    }
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== Location.PermissionStatus.GRANTED) {
-      setSharingError(
-        "Foreground location permission is needed for temporary visibility.",
-      );
-      setIsVisibleOnMap(false);
-      return;
-    }
-    try {
-      sharingUserIdRef.current = userId;
-      const watcher = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 9000,
-          distanceInterval: 12,
-        },
-        (position) => {
-          if (!isMountedRef.current || sharingUserIdRef.current !== userId)
-            return;
-          upsertPresence(userId, position.coords);
-          startPresenceHeartbeat();
-        },
-      );
-      locationWatcherRef.current = watcher;
-      if (isMountedRef.current) setIsVisibleOnMap(true);
-    } catch {
-      sharingUserIdRef.current = null;
-      if (isMountedRef.current) {
+  const startSharing = useCallback(
+    async (mode: Exclude<LocationVisibilityMode, "ghost">) => {
+      setSharingError(null);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) {
+        visibilityModeRef.current = "ghost";
+        setSharingError("Sign in to become visible on the map.");
         setIsVisibleOnMap(false);
-        setSharingError("Could not start temporary map visibility.");
+        setVisibilityMode("ghost");
+        return;
       }
-    }
-  }, [startPresenceHeartbeat, upsertPresence]);
-
-  const toggleVisibility = useCallback(
-    (enabled: boolean) => {
-      if (enabled) void startSharing();
-      else void stopSharing(true);
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        visibilityModeRef.current = "ghost";
+        setSharingError(
+          "Foreground location permission is needed for temporary visibility.",
+        );
+        setIsVisibleOnMap(false);
+        setVisibilityMode("ghost");
+        return;
+      }
+      try {
+        visibilityModeRef.current = mode;
+        sharingUserIdRef.current = userId;
+        setVisibilityMode(mode);
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        upsertPresence(userId, position.coords);
+        const watcher = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 9000,
+            distanceInterval: 12,
+          },
+          (position) => {
+            if (!isMountedRef.current || sharingUserIdRef.current !== userId)
+              return;
+            upsertPresence(userId, position.coords);
+            startPresenceHeartbeat();
+          },
+        );
+        locationWatcherRef.current = watcher;
+        startPresenceHeartbeat();
+        if (isMountedRef.current) setIsVisibleOnMap(true);
+      } catch {
+        locationWatcherRef.current?.remove();
+        locationWatcherRef.current = null;
+        clearPresenceHeartbeat();
+        sharingUserIdRef.current = null;
+        visibilityModeRef.current = "ghost";
+        latestPresencePayloadRef.current = null;
+        await deletePresence(userId).catch(() => undefined);
+        if (isMountedRef.current) {
+          setIsVisibleOnMap(false);
+          setVisibilityMode("ghost");
+          setSharingError("Could not start temporary map visibility.");
+        }
+      }
     },
-    [startSharing, stopSharing],
+    [
+      clearPresenceHeartbeat,
+      deletePresence,
+      startPresenceHeartbeat,
+      upsertPresence,
+    ],
+  );
+
+  const changeVisibilityMode = useCallback(
+    async (mode: LocationVisibilityMode) => {
+      setVisibilityMenuOpen(false);
+      if (mode === "ghost") {
+        await stopSharing(true);
+        return;
+      }
+
+      const userId = sharingUserIdRef.current;
+      const latestPayload = latestPresencePayloadRef.current;
+      if (!userId || !latestPayload) {
+        await startSharing(mode);
+        return;
+      }
+
+      visibilityModeRef.current = mode;
+      setVisibilityMode(mode);
+      setIsVisibleOnMap(true);
+      lastPresenceWriteRef.current = 0;
+      await deletePresence(userId).catch(() => undefined);
+      const nextPayload = { ...latestPayload, visibility_mode: mode };
+      latestPresencePayloadRef.current = nextPayload;
+      await writePresencePayload(userId, nextPayload, true);
+    },
+    [deletePresence, startSharing, stopSharing, writePresencePayload],
   );
 
   const loadEvents = useCallback(async () => {
@@ -777,6 +864,9 @@ export default function LiveMapScreen() {
           void stopSharing(true);
       },
     );
+    const refreshInterval = setInterval(() => {
+      if (isActive && isAppForegroundRef.current) void refreshActiveDrivers();
+    }, DRIVER_LIST_REFRESH_MS);
     const channel = supabase.channel(createDriverLocationsMapTopic());
     channel.on(
       "postgres_changes",
@@ -804,6 +894,7 @@ export default function LiveMapScreen() {
       const userId = sharingUserIdRef.current;
       sharingUserIdRef.current = null;
       void deletePresence(userId).catch(() => undefined);
+      clearInterval(refreshInterval);
       void supabase.removeChannel(channel);
       authListener.subscription.unsubscribe();
     };
@@ -978,7 +1069,10 @@ export default function LiveMapScreen() {
   const filtersTop = headerBottom + spacing.sm;
   const filtersBottom = filtersTop + 32;
   const visibilityTop = filtersBottom + 10;
-  const noticesTop = visibilityTop + 42;
+  const activeVisibilityMode =
+    VISIBILITY_MODES.find((mode) => mode.id === visibilityMode) ??
+    VISIBILITY_MODES[VISIBILITY_MODES.length - 1];
+  const noticesTop = visibilityTop + (visibilityMenuOpen ? 238 : 42);
   const eventCardBottom =
     insets.bottom + TAB_BAR_BOTTOM_GAP + TAB_BAR_HEIGHT + FLOATING_GAP;
   const routeCardBottom = eventCardBottom;
@@ -1106,12 +1200,12 @@ export default function LiveMapScreen() {
         />
 
         <TouchableOpacity
-          accessibilityLabel="Toggle temporary visibility on the NOXA map"
-          accessibilityHint="Location sharing lasts only while this map is open"
-          accessibilityRole="switch"
-          accessibilityState={{ checked: isVisibleOnMap }}
+          accessibilityLabel={`Map visibility: ${activeVisibilityMode.label}`}
+          accessibilityHint="Choose who can see your temporary live location"
+          accessibilityRole="button"
+          accessibilityState={{ expanded: visibilityMenuOpen }}
           activeOpacity={0.78}
-          onPress={() => toggleVisibility(!isVisibleOnMap)}
+          onPress={() => setVisibilityMenuOpen((current) => !current)}
           style={[
             styles.visibilityControl,
             isVisibleOnMap && styles.visibilityControlActive,
@@ -1119,7 +1213,7 @@ export default function LiveMapScreen() {
           ]}
         >
           <Ionicons
-            name={isVisibleOnMap ? "eye" : "eye-off-outline"}
+            name={activeVisibilityMode.icon}
             size={15}
             color={isVisibleOnMap ? colors.primaryHover : colors.textMuted}
           />
@@ -1129,15 +1223,66 @@ export default function LiveMapScreen() {
               isVisibleOnMap && styles.visibilityTitleActive,
             ]}
           >
-            {isVisibleOnMap ? "Visible" : "Hidden"}
+            {activeVisibilityMode.label}
           </Text>
-          <View
-            style={[
-              styles.visibilityStatus,
-              isVisibleOnMap && styles.visibilityStatusActive,
-            ]}
+          <Ionicons
+            name={visibilityMenuOpen ? "chevron-up" : "chevron-down"}
+            size={13}
+            color={colors.textSubtle}
           />
         </TouchableOpacity>
+
+        {visibilityMenuOpen ? (
+          <View style={[styles.visibilityMenu, { top: visibilityTop + 38 }]}>
+            <Text style={styles.visibilityMenuEyebrow}>WHO CAN SEE YOU</Text>
+            {VISIBILITY_MODES.map((mode) => {
+              const selected = visibilityMode === mode.id;
+              return (
+                <TouchableOpacity
+                  accessibilityLabel={`${mode.label}. ${mode.description}`}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  activeOpacity={0.76}
+                  key={mode.id}
+                  onPress={() => void changeVisibilityMode(mode.id)}
+                  style={[
+                    styles.visibilityOption,
+                    selected && styles.visibilityOptionSelected,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.visibilityOptionIcon,
+                      selected && styles.visibilityOptionIconSelected,
+                    ]}
+                  >
+                    <Ionicons
+                      name={mode.icon}
+                      size={16}
+                      color={selected ? colors.primaryHover : colors.textMuted}
+                    />
+                  </View>
+                  <View style={styles.visibilityOptionCopy}>
+                    <Text
+                      style={[
+                        styles.visibilityOptionLabel,
+                        selected && styles.visibilityOptionLabelSelected,
+                      ]}
+                    >
+                      {mode.label}
+                    </Text>
+                    <Text style={styles.visibilityOptionDescription}>
+                      {mode.description}
+                    </Text>
+                  </View>
+                  {selected ? (
+                    <Ionicons name="checkmark" size={16} color={colors.primaryHover} />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : null}
 
         {sharingError ? (
           <View
@@ -1353,6 +1498,7 @@ const styles = StyleSheet.create({
   visibilityControl: {
     position: "absolute",
     right: spacing.md,
+    minWidth: 104,
     height: 32,
     flexDirection: "row",
     alignItems: "center",
@@ -1375,14 +1521,61 @@ const styles = StyleSheet.create({
   visibilityTitleActive: {
     color: colors.text,
   },
-  visibilityStatus: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.textSubtle,
+  visibilityMenu: {
+    position: "absolute",
+    right: spacing.md,
+    width: 264,
+    overflow: "hidden",
+    padding: spacing.xs,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: "rgba(12,12,16,0.97)",
+    ...shadows.card,
   },
-  visibilityStatusActive: {
-    backgroundColor: colors.primaryHover,
+  visibilityMenuEyebrow: {
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: 6,
+    color: colors.textSubtle,
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+  },
+  visibilityOption: {
+    minHeight: 47,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+  },
+  visibilityOptionSelected: {
+    backgroundColor: colors.primarySubtle,
+  },
+  visibilityOptionIcon: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceSoft,
+  },
+  visibilityOptionIconSelected: {
+    backgroundColor: colors.primaryMuted,
+  },
+  visibilityOptionCopy: { flex: 1, minWidth: 0 },
+  visibilityOptionLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  visibilityOptionLabelSelected: { color: colors.text },
+  visibilityOptionDescription: {
+    marginTop: 1,
+    color: colors.textSubtle,
+    fontSize: 8,
+    fontWeight: "600",
   },
   sharingNotice: {
     position: "absolute",
