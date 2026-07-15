@@ -315,7 +315,7 @@ function AccountCard({ isSigningOut, onSignOut }: { isSigningOut: boolean; onSig
           onPress={() => router.push('/notifications')}
           style={({ pressed }) => [styles.linkRow, styles.linkRowBorder, pressed && styles.pressed]}>
           <View style={styles.linkIcon}><Ionicons name="notifications-outline" size={21} color={colors.text} /></View>
-          <Text style={styles.linkLabel}>Notifications</Text>
+          <Text style={[styles.linkLabel, styles.accountLinkLabel]}>Notifications</Text>
           <Ionicons name="chevron-forward" size={17} color={colors.textSubtle} />
         </Pressable>
         <Pressable
@@ -644,9 +644,27 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSoft,
   },
-  linkCopy: { flex: 1 },
-  linkLabel: { flex: 1, color: colors.text, fontSize: typography.body, fontWeight: '800' },
-  linkCaption: { marginTop: 2, color: colors.textMuted, fontSize: 10, fontWeight: '700' },
+  linkCopy: {
+    flex: 1,
+    alignSelf: 'stretch',
+    justifyContent: 'center',
+    minWidth: 0,
+    paddingVertical: spacing.xs,
+  },
+  linkLabel: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: '800',
+    lineHeight: typography.lineHeight.body,
+  },
+  accountLinkLabel: { flex: 1 },
+  linkCaption: {
+    marginTop: 2,
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: typography.lineHeight.caption,
+  },
   logoutIcon: { backgroundColor: colors.primarySubtle },
   logoutText: { flex: 1, color: colors.primaryHover, fontSize: typography.body, fontWeight: '800' },
 });
