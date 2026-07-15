@@ -30,9 +30,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#080A0F",
+          "image": "./assets/images/noxa-splash-logo.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#C8102E",
           "dark": {
-            "backgroundColor": "#080A0F"
+            "image": "./assets/images/noxa-splash-logo.png",
+            "backgroundColor": "#C8102E"
           }
         }
       ]
@@ -42,7 +46,9 @@
       "reactCompiler": true
     },
     "splash": {
-      "backgroundColor": "#080A0F"
+      "image": "./assets/images/noxa-splash-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#C8102E"
     }
   }
 }
