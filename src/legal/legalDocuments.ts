@@ -1,5 +1,5 @@
 export const LEGAL_EFFECTIVE_DATE = 'July 15, 2026';
-export const NOXA_OPERATOR = 'KARAKETIDIS';
+export const NOXA_OPERATOR = 'SERGKEI KARAKETIDIS';
 export const SUPPORT_EMAIL = 'noxastreetapp@gmail.com';
 
 export type LegalSection = {
@@ -24,7 +24,7 @@ export const privacyPolicy: LegalDocument = {
     {
       title: '1. Who we are',
       paragraphs: [
-        'NOXA is operated by KARAKETIDIS, an independent developer based in Greece. For data-protection purposes, KARAKETIDIS is the controller of personal data processed through NOXA.',
+        'NOXA is operated by SERGKEI KARAKETIDIS, an independent developer based in Greece. For data-protection purposes, SERGKEI KARAKETIDIS is the controller of personal data processed through NOXA.',
         'Questions, privacy requests, and account-deletion requests can be sent to noxastreetapp@gmail.com.',
       ],
     },
@@ -120,7 +120,7 @@ export const privacyPolicy: LegalDocument = {
       title: '11. Changes and contact',
       paragraphs: [
         'We may update this policy as NOXA changes. Material updates will be communicated in the app or by another reasonable method, and the effective date will be updated.',
-        'Privacy contact and controller email: noxastreetapp@gmail.com. Operator: KARAKETIDIS, Greece.',
+        'Privacy contact and controller email: noxastreetapp@gmail.com. Operator: SERGKEI KARAKETIDIS, Greece.',
       ],
     },
   ],
@@ -135,7 +135,7 @@ export const termsOfService: LegalDocument = {
     {
       title: '1. Acceptance',
       paragraphs: [
-        'By creating an account or using NOXA, you agree to these Terms of Service and the Privacy Policy. If you do not agree, do not use NOXA. NOXA is operated by KARAKETIDIS, an independent developer based in Greece.',
+        'By creating an account or using NOXA, you agree to these Terms of Service and the Privacy Policy. If you do not agree, do not use NOXA. NOXA is operated by SERGKEI KARAKETIDIS, an independent developer based in Greece.',
       ],
     },
     {
@@ -251,7 +251,7 @@ export const termsOfService: LegalDocument = {
       title: '17. Changes and contact',
       paragraphs: [
         'We may update these terms to reflect service or legal changes. Material changes will be communicated by a reasonable method. Continued use after the new effective date means you accept the updated terms where permitted by law.',
-        'Questions about these terms: noxastreetapp@gmail.com. Operator: KARAKETIDIS, Greece.',
+        'Questions about these terms: noxastreetapp@gmail.com. Operator: SERGKEI KARAKETIDIS, Greece.',
       ],
     },
   ],

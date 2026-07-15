@@ -5,6 +5,7 @@ import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'r
 import { NoxaHeader, NoxaScreen } from '@/src/components/ui';
 import {
   LEGAL_EFFECTIVE_DATE,
+  NOXA_OPERATOR,
   SUPPORT_EMAIL,
   type LegalDocument,
 } from '@/src/legal/legalDocuments';
@@ -90,7 +91,7 @@ export function LegalDocumentScreen({ document }: LegalDocumentScreenProps) {
             </Pressable>
           </View>
 
-          <Text style={styles.footer}>NOXA · OPERATED BY KARAKETIDIS · GREECE</Text>
+          <Text style={styles.footer}>NOXA · OPERATED BY {NOXA_OPERATOR} · GREECE</Text>
         </ScrollView>
       </View>
     </NoxaScreen>
