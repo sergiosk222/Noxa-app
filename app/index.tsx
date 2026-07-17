@@ -1,13 +1,14 @@
 import { Redirect } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
 
+import { NoxaAnimatedSplash } from '@/src/components/NoxaAnimatedSplash';
 import { supabase } from '@/src/lib/supabase';
 
 type Destination = '/welcome' | '/(tabs)' | null;
 
 export default function IndexRoute() {
   const [destination, setDestination] = useState<Destination>(null);
+  const [isSplashComplete, setIsSplashComplete] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,22 +35,13 @@ export default function IndexRoute() {
     };
   }, []);
 
-  if (!destination) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color="#E11D2E" />
-      </View>
-    );
+  const finishSplash = useCallback(() => {
+    setIsSplashComplete(true);
+  }, []);
+
+  if (!destination || !isSplashComplete) {
+    return <NoxaAnimatedSplash onAnimationComplete={finishSplash} />;
   }
 
   return <Redirect href={destination} />;
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#050608',
-  },
-});
