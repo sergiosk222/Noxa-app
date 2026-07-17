@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { ComponentProps, ReactNode } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -14,8 +15,18 @@ export function NoxaAuthField({
   label,
   rightAction,
   style,
+  onFocus,
+  onBlur,
   ...props
 }: NoxaAuthFieldProps) {
+  useEffect(() => {
+    console.log(`[AuthField:${label}] mounted`);
+
+    return () => {
+      console.log(`[AuthField:${label}] unmounted`);
+    };
+  }, [label]);
+
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.label}>{label}</Text>
@@ -29,6 +40,14 @@ export function NoxaAuthField({
             style,
           ]}
           {...props}
+          onFocus={(event) => {
+            console.log(`[AuthField:${label}] focus`);
+            onFocus?.(event);
+          }}
+          onBlur={(event) => {
+            console.log(`[AuthField:${label}] blur`);
+            onBlur?.(event);
+          }}
         />
         {rightAction ? (
           <View style={styles.inputAction}>{rightAction}</View>
