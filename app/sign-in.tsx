@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import type { ComponentProps, ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,10 +7,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
+import { NoxaAuthField } from "@/src/components/auth/NoxaAuthField";
 import { supabase } from "@/src/lib/supabase";
 import {
   NoxaButton,
@@ -19,7 +18,7 @@ import {
   NoxaIconButton,
   NoxaScreen,
 } from "@/src/components/ui";
-import { colors, radius, spacing, typography } from "@/src/theme";
+import { colors, spacing, typography } from "@/src/theme";
 
 type SignInErrors = {
   email?: string;
@@ -137,7 +136,7 @@ export default function SignInScreen() {
             </View>
 
             <View style={styles.form}>
-              <Field
+              <NoxaAuthField
                 autoCapitalize="none"
                 autoComplete="email"
                 error={errors.email}
@@ -150,7 +149,7 @@ export default function SignInScreen() {
                 value={email}
               />
 
-              <Field
+              <NoxaAuthField
                 autoCapitalize="none"
                 autoComplete="password"
                 error={errors.password}
@@ -206,36 +205,6 @@ export default function SignInScreen() {
   );
 }
 
-type FieldProps = ComponentProps<typeof TextInput> & {
-  error?: string;
-  label: string;
-  rightAction?: ReactNode;
-};
-
-function Field({ error, label, rightAction, style, ...props }: FieldProps) {
-  return (
-    <View style={styles.fieldWrap}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputShell, error && styles.inputError]}>
-        <TextInput
-          placeholderTextColor={colors.textSubtle}
-          selectionColor={colors.primary}
-          style={[
-            styles.input,
-            rightAction ? styles.inputWithAction : null,
-            style,
-          ]}
-          {...props}
-        />
-        {rightAction ? (
-          <View style={styles.inputAction}>{rightAction}</View>
-        ) : null}
-      </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   keyboardView: { flex: 1 },
   scrollContent: {
@@ -274,32 +243,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.lineHeight.body,
   },
   form: { gap: spacing.md },
-  fieldWrap: { gap: spacing.xs },
-  label: {
-    color: colors.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "800",
-    letterSpacing: typography.letterSpacing.caption,
-  },
-  inputShell: {
-    minHeight: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceSoft,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  inputError: { borderColor: colors.borderAccent },
-  input: {
-    flex: 1,
-    minHeight: 56,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    fontSize: typography.body,
-  },
-  inputWithAction: { paddingRight: spacing.xs },
-  inputAction: { paddingRight: spacing.md },
   showText: {
     color: colors.primary,
     fontSize: typography.caption,
