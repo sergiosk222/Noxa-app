@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
+  Image,
   Platform,
   Switch,
   StyleSheet,
@@ -56,6 +57,8 @@ type LatLng = { latitude: number; longitude: number };
 type PresenceLocationPayload = {
   latitude: number;
   longitude: number;
+  visibility_mode: "Global";
+  share_expires_at: string;
   heading: number | null;
   speed_mps: number | null;
   accuracy_meters: number | null;
@@ -78,6 +81,7 @@ const DEFAULT_DELTA = { latitudeDelta: 0.075, longitudeDelta: 0.075 };
 const ACTIVE_DRIVER_WINDOW_MS = 2 * 60 * 1000;
 const DRIVER_LOCATION_MIN_WRITE_MS = 7000;
 const DRIVER_PRESENCE_HEARTBEAT_MS = 45 * 1000;
+const DRIVER_PRESENCE_LEASE_MS = 90 * 1000;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let driverLocationsMapChannelSequence = 0;
@@ -87,10 +91,10 @@ const TAB_BAR_BOTTOM_GAP = spacing.md;
 const FLOATING_GAP = spacing.sm;
 
 const androidNoxaMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#0A0C0F" }] },
+  { elementType: "geometry", stylers: [{ color: "#07080A" }] },
   { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#737984" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#090B0E" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#07080A" }] },
   {
     featureType: "administrative",
     elementType: "geometry.stroke",
@@ -99,18 +103,23 @@ const androidNoxaMapStyle = [
   {
     featureType: "landscape",
     elementType: "geometry",
-    stylers: [{ color: "#0A0C0F" }],
+    stylers: [{ color: "#090A0D" }],
   },
   {
     featureType: "landscape.natural",
     elementType: "geometry",
-    stylers: [{ color: "#111419" }],
+    stylers: [{ color: "#090F0C" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
   },
   { featureType: "poi.business", stylers: [{ visibility: "off" }] },
   {
     featureType: "poi.park",
     elementType: "geometry",
-    stylers: [{ color: "#111419" }],
+    stylers: [{ color: "#090F0C" }],
   },
   { featureType: "poi.school", stylers: [{ visibility: "off" }] },
   { featureType: "poi.shopping_mall", stylers: [{ visibility: "off" }] },
@@ -119,28 +128,28 @@ const androidNoxaMapStyle = [
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [{ color: "#242830" }],
+    stylers: [{ color: "#25272D" }],
   },
   {
     featureType: "road.arterial",
     elementType: "geometry",
-    stylers: [{ color: "#2C313A" }],
+    stylers: [{ color: "#25272D" }],
   },
   {
     featureType: "road.highway",
     elementType: "geometry",
-    stylers: [{ color: "#343943" }],
+    stylers: [{ color: "#30323A" }],
   },
   {
     featureType: "road.local",
     elementType: "geometry",
-    stylers: [{ color: "#1D222A" }],
+    stylers: [{ color: "#1B1D22" }],
   },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
   {
     featureType: "water",
     elementType: "geometry",
-    stylers: [{ color: "#070A0E" }],
+    stylers: [{ color: "#050A12" }],
   },
 ] satisfies MapViewProps["customMapStyle"];
 
@@ -288,12 +297,32 @@ function EventCard({
   );
 }
 
+function driverInitials(driver: ActiveDriver) {
+  const label = driverLabel(driver);
+  const initials = label
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return initials || null;
+}
+
 function DriverMarker({ driver }: { driver: ActiveDriver }) {
   const label = driverLabel(driver);
+  const [imageFailed, setImageFailed] = useState(false);
+  const [tracksViewChanges, setTracksViewChanges] = useState(
+    Boolean(driver.profile?.avatar_url),
+  );
+  const avatarUrl = imageFailed ? null : driver.profile?.avatar_url;
+  const initials = driverInitials(driver);
+
   return (
     <Marker
       coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
       accessibilityLabel={`${label} is visible on the NOXA map`}
+      anchor={{ x: 0.5, y: 1 }}
+      tracksViewChanges={tracksViewChanges}
       onPress={() =>
         router.push({
           pathname: "/driver-profile/[id]",
@@ -302,9 +331,27 @@ function DriverMarker({ driver }: { driver: ActiveDriver }) {
       }
       title={label}
     >
-      <View style={styles.driverMarker}>
-        <View style={styles.driverMarkerAccent} />
-        <Ionicons name="car-sport" size={15} color={colors.text} />
+      <View style={styles.driverMarkerWrap}>
+        <View style={styles.driverMarker}>
+          {avatarUrl ? (
+            <Image
+              accessibilityIgnoresInvertColors
+              source={{ uri: avatarUrl }}
+              onLoadEnd={() => setTracksViewChanges(false)}
+              onError={() => {
+                setImageFailed(true);
+                setTracksViewChanges(false);
+              }}
+              style={styles.driverMarkerImage}
+            />
+          ) : initials ? (
+            <Text style={styles.driverMarkerInitials}>{initials}</Text>
+          ) : (
+            <Ionicons name="person" size={19} color={colors.text} />
+          )}
+          <View style={styles.driverMarkerStatus} />
+        </View>
+        <View style={styles.driverMarkerTail} />
       </View>
     </Marker>
   );
@@ -398,6 +445,8 @@ export default function LiveMapScreen() {
   const routeRequestKeyRef = useRef<string | null>(null);
   const routeRequestIdRef = useRef(0);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
+  const watcherSetupIdRef = useRef(0);
+  const lastHeadingRef = useRef<number | null>(null);
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
@@ -411,6 +460,10 @@ export default function LiveMapScreen() {
   const activeDriversRefreshInFlightRef = useRef(false);
   const activeDriversRefreshQueuedRef = useRef(false);
   const [isVisibleOnMap, setIsVisibleOnMap] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [driverRefreshError, setDriverRefreshError] = useState(false);
+  const [isRouteFollowing, setIsRouteFollowing] = useState(false);
+  const isRouteFollowingRef = useRef(false);
   const [sharingError, setSharingError] = useState<string | null>(null);
   const [activeDrivers, setActiveDrivers] = useState<ActiveDriver[]>([]);
   const normalizedFocusEventId = normalizeParam(params.focusEventId);
@@ -421,11 +474,42 @@ export default function LiveMapScreen() {
       ? normalizedFocusEventId
       : null;
   const isRouteMode = normalizedMapMode === "route" && Boolean(focusEventId);
+  const onlineCount = activeDrivers.length;
+  const markerDrivers = activeDrivers.filter(
+    (driver) => driver.user_id !== currentUserId,
+  );
+  const shouldRenderRoute =
+    isRouteMode &&
+    routeStatus === "ready" &&
+    route !== null &&
+    route.coordinates.filter((point) =>
+      hasValidLatLng(point.latitude, point.longitude),
+    ).length >= 2;
 
   const initialRegion = useMemo(() => pointRegion(THESSALONIKI), []);
 
   const animateTo = useCallback(
     (region: Region) => mapRef.current?.animateToRegion(region, 550),
+    [],
+  );
+
+  const setRouteFollowing = useCallback((enabled: boolean) => {
+    isRouteFollowingRef.current = enabled;
+    setIsRouteFollowing(enabled);
+  }, []);
+
+  const animateNavigationCamera = useCallback(
+    (point: LatLng, heading?: number | null) => {
+      mapRef.current?.animateCamera(
+        {
+          center: point,
+          heading: heading ?? 0,
+          pitch: 54,
+          zoom: 17,
+        },
+        { duration: 650 },
+      );
+    },
     [],
   );
 
@@ -447,24 +531,6 @@ export default function LiveMapScreen() {
     },
     [driverLocation, insets.bottom, insets.top],
   );
-
-  const loadDriverLocation = useCallback(async () => {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== Location.PermissionStatus.GRANTED) {
-      setPermissionDenied(true);
-      return null;
-    }
-    setPermissionDenied(false);
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-    const point = {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-    };
-    setDriverLocation(point);
-    return point;
-  }, []);
 
   const clearPresenceHeartbeat = useCallback(() => {
     if (heartbeatIntervalRef.current) {
@@ -554,6 +620,10 @@ export default function LiveMapScreen() {
           heading !== null && heading >= 0 && heading < 360 ? heading : null,
         speed_mps: speed !== null && speed >= 0 ? speed : null,
         accuracy_meters: accuracy !== null && accuracy >= 0 ? accuracy : null,
+        visibility_mode: "Global",
+        share_expires_at: new Date(
+          Date.now() + DRIVER_PRESENCE_LEASE_MS,
+        ).toISOString(),
       };
       latestPresencePayloadRef.current = payload;
       void writePresencePayload(userId, payload);
@@ -577,56 +647,83 @@ export default function LiveMapScreen() {
     }, DRIVER_PRESENCE_HEARTBEAT_MS);
   }, [writePresencePayload]);
 
-  const startSharing = useCallback(async () => {
-    setSharingError(null);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    if (!userId) {
-      setSharingError("Sign in to become visible on the map.");
-      setIsVisibleOnMap(false);
-      return;
-    }
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== Location.PermissionStatus.GRANTED) {
-      setSharingError(
-        "Foreground location permission is needed for temporary visibility.",
-      );
-      setIsVisibleOnMap(false);
-      return;
-    }
+  const handlePosition = useCallback(
+    (position: Location.LocationObject) => {
+      const { coords } = position;
+      if (!hasValidLatLng(coords.latitude, coords.longitude)) return;
+      const heading = finiteOrNull(coords.heading);
+      const validHeading = heading !== null && heading >= 0 && heading <= 360;
+      if (validHeading) lastHeadingRef.current = heading;
+      const point = { latitude: coords.latitude, longitude: coords.longitude };
+      setDriverLocation(point);
+      const userId = sharingUserIdRef.current;
+      if (userId) upsertPresence(userId, coords);
+      if (isRouteFollowingRef.current) {
+        animateNavigationCamera(
+          point,
+          validHeading ? heading : lastHeadingRef.current,
+        );
+      }
+    },
+    [animateNavigationCamera, upsertPresence],
+  );
+
+  const ensureForegroundWatcher = useCallback(async () => {
+    const setupId = watcherSetupIdRef.current + 1;
+    watcherSetupIdRef.current = setupId;
+    locationWatcherRef.current?.remove();
+    locationWatcherRef.current = null;
     try {
-      sharingUserIdRef.current = userId;
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (watcherSetupIdRef.current !== setupId || !isMountedRef.current)
+        return null;
+      if (permission.status !== Location.PermissionStatus.GRANTED) {
+        setPermissionDenied(true);
+        setSharingError(
+          (current) =>
+            current ??
+            "Allow location access so your selected audience can see you on the NOXA map.",
+        );
+        return null;
+      }
+      setPermissionDenied(false);
+      const current = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      if (watcherSetupIdRef.current !== setupId || !isMountedRef.current)
+        return null;
+      handlePosition(current);
       const watcher = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
-          timeInterval: 9000,
-          distanceInterval: 12,
+          timeInterval: 2500,
+          distanceInterval: 5,
         },
-        (position) => {
-          if (!isMountedRef.current || sharingUserIdRef.current !== userId)
-            return;
-          upsertPresence(userId, position.coords);
-          startPresenceHeartbeat();
-        },
+        handlePosition,
       );
-      locationWatcherRef.current = watcher;
-      if (isMountedRef.current) setIsVisibleOnMap(true);
-    } catch {
-      sharingUserIdRef.current = null;
-      if (isMountedRef.current) {
-        setIsVisibleOnMap(false);
-        setSharingError("Could not start temporary map visibility.");
+      if (watcherSetupIdRef.current !== setupId || !isMountedRef.current) {
+        watcher.remove();
+        return null;
       }
+      locationWatcherRef.current = watcher;
+      return {
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      };
+    } catch (error) {
+      console.warn("NOXA location watcher failed", error);
+      if (isMountedRef.current) {
+        setPermissionDenied(true);
+        setSharingError("Could not start location sharing.");
+      }
+      return null;
     }
-  }, [startPresenceHeartbeat, upsertPresence]);
+  }, [handlePosition]);
 
-  const toggleVisibility = useCallback(
-    (enabled: boolean) => {
-      if (enabled) void startSharing();
-      else void stopSharing(true);
-    },
-    [startSharing, stopSharing],
-  );
+  const loadDriverLocation = useCallback(async () => {
+    if (driverLocation) return driverLocation;
+    return ensureForegroundWatcher();
+  }, [driverLocation, ensureForegroundWatcher]);
 
   const loadEvents = useCallback(async () => {
     const { data } = await supabase
@@ -665,12 +762,14 @@ export default function LiveMapScreen() {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const userId = sessionData.session?.user.id;
+      setCurrentUserId(userId ?? null);
       if (!userId) {
         if (isMountedRef.current) setActiveDrivers([]);
         return;
       }
+      const now = new Date();
       const since = new Date(
-        Date.now() - ACTIVE_DRIVER_WINDOW_MS,
+        now.getTime() - ACTIVE_DRIVER_WINDOW_MS,
       ).toISOString();
       const { data, error } = await supabase
         .from("driver_locations")
@@ -678,10 +777,15 @@ export default function LiveMapScreen() {
           "user_id,latitude,longitude,updated_at,profiles(id,display_name,username,avatar_url)",
         )
         .gte("updated_at", since)
-        .neq("user_id", userId)
+        .gt("share_expires_at", now.toISOString())
+        .neq("visibility_mode", "Ghost")
         .order("updated_at", { ascending: false });
+      if (error) {
+        console.warn("NOXA active drivers refresh failed", error.message);
+        if (isMountedRef.current) setDriverRefreshError(true);
+        return;
+      }
       if (
-        error ||
         !isMountedRef.current ||
         activeDriversRequestIdRef.current !== requestId
       )
@@ -690,6 +794,7 @@ export default function LiveMapScreen() {
         .map(normalizeActiveDriver)
         .filter((driver): driver is ActiveDriver => driver !== null);
       setActiveDrivers(drivers);
+      setDriverRefreshError(false);
     } finally {
       activeDriversRefreshInFlightRef.current = false;
       if (activeDriversRefreshQueuedRef.current) {
@@ -698,6 +803,59 @@ export default function LiveMapScreen() {
       }
     }
   }, []);
+
+  const startSharing = useCallback(async () => {
+    setSharingError(null);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    setCurrentUserId(userId ?? null);
+    if (!userId) {
+      setSharingError("Sign in to become visible on the map.");
+      setIsVisibleOnMap(false);
+      return;
+    }
+    try {
+      sharingUserIdRef.current = userId;
+      const point = await ensureForegroundWatcher();
+      if (!point || sharingUserIdRef.current !== userId) {
+        sharingUserIdRef.current = null;
+        setIsVisibleOnMap(false);
+        return;
+      }
+      if (latestPresencePayloadRef.current) {
+        await writePresencePayload(
+          userId,
+          latestPresencePayloadRef.current,
+          true,
+        );
+      }
+      startPresenceHeartbeat();
+      if (isMountedRef.current) {
+        setIsVisibleOnMap(true);
+        void refreshActiveDrivers();
+      }
+    } catch (error) {
+      console.warn("NOXA sharing start failed", error);
+      sharingUserIdRef.current = null;
+      if (isMountedRef.current) {
+        setIsVisibleOnMap(false);
+        setSharingError("Could not start location sharing.");
+      }
+    }
+  }, [
+    ensureForegroundWatcher,
+    refreshActiveDrivers,
+    startPresenceHeartbeat,
+    writePresencePayload,
+  ]);
+
+  const toggleVisibility = useCallback(
+    (enabled: boolean) => {
+      if (enabled) void startSharing();
+      else void stopSharing(true).then(() => refreshActiveDrivers());
+    },
+    [refreshActiveDrivers, startSharing, stopSharing],
+  );
 
   useEffect(() => {
     let isActive = true;
@@ -749,18 +907,31 @@ export default function LiveMapScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       isAppForegroundRef.current = nextState === "active";
-      if (nextState === "active") startPresenceHeartbeat();
-      else clearPresenceHeartbeat();
+      if (nextState === "active") {
+        void ensureForegroundWatcher();
+        startPresenceHeartbeat();
+      } else {
+        void stopSharing(true);
+        clearPresenceHeartbeat();
+        watcherSetupIdRef.current += 1;
+        locationWatcherRef.current?.remove();
+        locationWatcherRef.current = null;
+      }
     });
     return () => subscription.remove();
-  }, [clearPresenceHeartbeat, startPresenceHeartbeat]);
+  }, [
+    clearPresenceHeartbeat,
+    ensureForegroundWatcher,
+    startPresenceHeartbeat,
+    stopSharing,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
       void (async () => {
         const [point, rows] = await Promise.all([
-          loadDriverLocation().catch(() => null),
+          ensureForegroundWatcher().catch(() => null),
           loadEvents(),
         ]);
         if (!isActive) return;
@@ -778,8 +949,33 @@ export default function LiveMapScreen() {
       })();
       return () => {
         isActive = false;
+        void stopSharing(true);
+        watcherSetupIdRef.current += 1;
+        locationWatcherRef.current?.remove();
+        locationWatcherRef.current = null;
       };
-    }, [animateTo, focusEventId, isRouteMode, loadDriverLocation, loadEvents]),
+    }, [
+      animateTo,
+      ensureForegroundWatcher,
+      focusEventId,
+      isRouteMode,
+      loadEvents,
+      stopSharing,
+    ]),
+  );
+
+  const clearRouteState = useCallback(
+    (replaceRoute = true) => {
+      routeRequestIdRef.current += 1;
+      routeRequestKeyRef.current = null;
+      setRoute(null);
+      setRouteStatus("idle");
+      setRouteMessage(null);
+      setRouteFollowing(false);
+      setSelectedEvent(null);
+      if (replaceRoute) router.replace("/(tabs)");
+    },
+    [setRouteFollowing],
   );
 
   useEffect(() => {
@@ -792,11 +988,8 @@ export default function LiveMapScreen() {
   }, [animateTo, events, focusEventId, isRouteMode]);
 
   useEffect(() => {
-    setRoute(null);
-    setRouteMessage(null);
-    setRouteStatus("idle");
-    routeRequestKeyRef.current = null;
-  }, [focusEventId, isRouteMode]);
+    if (!isRouteMode || !focusEventId) clearRouteState(false);
+  }, [clearRouteState, focusEventId, isRouteMode]);
 
   const requestRoute = useCallback(async () => {
     if (!isRouteMode || !focusEventId || !hasValidCoordinates(selectedEvent))
@@ -848,6 +1041,7 @@ export default function LiveMapScreen() {
 
     setRoute(data);
     setRouteStatus("ready");
+    setRouteFollowing(true);
     fitRouteToMap(data.coordinates, {
       latitude: selectedEvent.latitude,
       longitude: selectedEvent.longitude,
@@ -860,6 +1054,7 @@ export default function LiveMapScreen() {
     permissionDenied,
     routeStatus,
     selectedEvent,
+    setRouteFollowing,
   ]);
 
   useEffect(() => {
@@ -872,14 +1067,10 @@ export default function LiveMapScreen() {
     };
   }, []);
 
-  const closeRouteMode = useCallback(() => {
-    routeRequestIdRef.current += 1;
-    routeRequestKeyRef.current = null;
-    setRoute(null);
-    setRouteStatus("idle");
-    setRouteMessage(null);
-    router.setParams({ mapMode: undefined, focusEventId: undefined });
-  }, []);
+  const closeRouteMode = useCallback(
+    () => clearRouteState(true),
+    [clearRouteState],
+  );
 
   const retryRoute = useCallback(() => {
     routeRequestKeyRef.current = null;
@@ -897,8 +1088,20 @@ export default function LiveMapScreen() {
   const recenterMap = useCallback(async () => {
     const point =
       driverLocation ?? (await loadDriverLocation().catch(() => null));
+    if (isRouteMode && point) {
+      setRouteFollowing(true);
+      animateNavigationCamera(point, lastHeadingRef.current);
+      return;
+    }
     animateTo(point ? pointRegion(point) : pointRegion(THESSALONIKI));
-  }, [animateTo, driverLocation, loadDriverLocation]);
+  }, [
+    animateNavigationCamera,
+    animateTo,
+    driverLocation,
+    isRouteMode,
+    loadDriverLocation,
+    setRouteFollowing,
+  ]);
 
   const headerTop = insets.top + spacing.sm;
   const headerBottom = headerTop + 52;
@@ -930,8 +1133,11 @@ export default function LiveMapScreen() {
         showsScale={false}
         showsCompass={false}
         toolbarEnabled={false}
+        onPanDrag={() => {
+          if (isRouteFollowingRef.current) setRouteFollowing(false);
+        }}
       >
-        {route ? (
+        {shouldRenderRoute ? (
           <>
             <Polyline
               coordinates={route.coordinates}
@@ -949,7 +1155,7 @@ export default function LiveMapScreen() {
             />
           </>
         ) : null}
-        {activeDrivers.map((driver) => (
+        {markerDrivers.map((driver) => (
           <DriverMarker key={driver.user_id} driver={driver} />
         ))}
         {events.map((event) => (
@@ -1003,7 +1209,8 @@ export default function LiveMapScreen() {
           <View style={styles.visibilityCopy}>
             <Text style={styles.visibilityTitle}>Visible on Map</Text>
             <Text style={styles.visibilityText}>
-              Temporary while this map is open.
+              {onlineCount} online visible{" "}
+              {onlineCount === 1 ? "driver" : "drivers"}.
             </Text>
           </View>
           <Switch
@@ -1018,10 +1225,34 @@ export default function LiveMapScreen() {
           />
         </View>
 
+        <View
+          pointerEvents="none"
+          style={[styles.onlinePill, { top: headerBottom + 74 }]}
+        >
+          <Text style={styles.locationNoticeText}>
+            {onlineCount} online •{" "}
+            {isRouteFollowing ? "Route follow on" : "Live Map"}
+          </Text>
+        </View>
+
+        {driverRefreshError ? (
+          <View
+            pointerEvents="none"
+            style={[styles.sharingNotice, { top: headerBottom + 112 }]}
+          >
+            <Text style={styles.locationNoticeText}>
+              Live drivers are reconnecting.
+            </Text>
+          </View>
+        ) : null}
+
         {sharingError ? (
           <View
             pointerEvents="none"
-            style={[styles.sharingNotice, { top: headerBottom + 74 }]}
+            style={[
+              styles.sharingNotice,
+              { top: headerBottom + (driverRefreshError ? 150 : 112) },
+            ]}
           >
             <Text style={styles.locationNoticeText}>{sharingError}</Text>
           </View>
@@ -1032,7 +1263,7 @@ export default function LiveMapScreen() {
             pointerEvents="none"
             style={[
               styles.locationNotice,
-              { top: headerBottom + (sharingError ? 118 : 74) },
+              { top: headerBottom + (sharingError ? 156 : 112) },
             ]}
           >
             <Text style={styles.locationNoticeText}>
@@ -1141,23 +1372,51 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.13)",
     backgroundColor: "#131720",
   },
+  driverMarkerWrap: {
+    alignItems: "center",
+  },
   driverMarker: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.78)",
-    backgroundColor: "rgba(20,24,33,0.94)",
+    overflow: "hidden",
+    borderWidth: 3,
+    borderColor: "#11151D",
+    backgroundColor: "rgba(20,24,33,0.96)",
   },
-  driverMarkerAccent: {
-    position: "absolute",
-    top: 3,
-    right: 3,
-    width: 7,
-    height: 7,
+  driverMarkerImage: {
+    width: "100%",
+    height: "100%",
     borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.72)",
+  },
+  driverMarkerInitials: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  driverMarkerStatus: {
+    position: "absolute",
+    right: 1,
+    bottom: 2,
+    width: 10,
+    height: 10,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: "#11151D",
+    backgroundColor: colors.accent,
+  },
+  driverMarkerTail: {
+    width: 10,
+    height: 10,
+    marginTop: -3,
+    transform: [{ rotate: "45deg" }],
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "rgba(255,36,36,0.82)",
     backgroundColor: colors.accent,
   },
   markerDot: {
@@ -1201,6 +1460,16 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: typography.caption,
     fontWeight: "700",
+  },
+  onlinePill: {
+    position: "absolute",
+    alignSelf: "center",
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.11)",
+    backgroundColor: "rgba(10,12,16,0.78)",
   },
   sharingNotice: {
     position: "absolute",
