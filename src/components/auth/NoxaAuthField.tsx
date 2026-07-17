@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import type { ComponentProps, ReactNode } from "react";
+import { useEffect, type ComponentProps, type ReactNode } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { colors, radius, spacing, typography } from "@/src/theme";
