@@ -29,6 +29,7 @@ import {
 } from "@/src/components/ui";
 import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type EventForm = {
   title: string;
@@ -153,6 +154,7 @@ function prefillFromEvent(event: EventRow): EventForm {
 }
 
 export default function EventEditorScreen() {
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id?: string }>();
   const eventId = typeof params.id === "string" ? params.id : undefined;
   const isEditing = Boolean(eventId);
@@ -632,24 +634,70 @@ export default function EventEditorScreen() {
                 </Marker>
               ) : null}
             </MapView>
-            <View style={styles.mapModalHeader}>
-              <Pressable onPress={() => setMapModalVisible(false)}>
+            <View
+              style={[
+                styles.mapModalHeader,
+                { top: insets.top + spacing.sm },
+              ]}
+            >
+              <Pressable
+                onPress={() => setMapModalVisible(false)}
+                style={styles.mapHeaderSide}
+              >
                 <Text style={styles.pickerAction}>Cancel</Text>
               </Pressable>
-              <Text style={styles.pickerTitle}>Exact event location</Text>
-              <Pressable onPress={confirmDraftLocation}>
-                <Text style={styles.pickerDone}>Confirm Location</Text>
+              <Text
+                style={styles.mapPickerTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                Exact event location
+              </Text>
+              <View style={styles.mapHeaderSide} />
+            </View>
+            <View
+              style={[
+                styles.mapActionSheet,
+                { bottom: Math.max(insets.bottom, spacing.md) },
+              ]}
+            >
+              <Pressable
+                onPress={useCurrentLocationInModal}
+                disabled={isLocating}
+                style={({ pressed }) => [
+                  styles.modalLocate,
+                  pressed && styles.pressed,
+                  isLocating && styles.disabled,
+                ]}
+              >
+                {isLocating ? (
+                  <ActivityIndicator color={colors.text} size="small" />
+                ) : (
+                  <Text style={styles.locateIcon}>⌖</Text>
+                )}
+                <Text style={styles.locationActionText}>
+                  {isLocating ? "Locating…" : "Use Current Location"}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Confirm event location"
+                onPress={confirmDraftLocation}
+                disabled={!draftLocation || isLocating}
+                style={({ pressed }) => [
+                  styles.confirmLocationButton,
+                  pressed && styles.pressed,
+                  (!draftLocation || isLocating) && styles.disabled,
+                ]}
+              >
+                {isLocating ? (
+                  <ActivityIndicator color={colors.text} size="small" />
+                ) : null}
+                <Text style={styles.confirmLocationText}>
+                  {isLocating ? "Confirming…" : "Confirm Location"}
+                </Text>
               </Pressable>
             </View>
-            <Pressable
-              onPress={useCurrentLocationInModal}
-              disabled={isLocating}
-              style={styles.modalLocate}
-            >
-              <Text style={styles.locationActionText}>
-                {isLocating ? "Locating…" : "Use Current Location"}
-              </Text>
-            </Pressable>
           </View>
         </Modal>
         <Modal
@@ -872,9 +920,9 @@ const styles = StyleSheet.create({
   mapModal: { flex: 1, backgroundColor: colors.background },
   mapModalHeader: {
     position: "absolute",
-    top: spacing.xl,
     left: spacing.md,
     right: spacing.md,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -885,16 +933,61 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: "rgba(10,12,16,0.90)",
   },
-  modalLocate: {
+  mapHeaderSide: {
+    width: 76,
+    flexShrink: 0,
+  },
+  mapPickerTitle: {
+    flex: 1,
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  mapActionSheet: {
     position: "absolute",
+    left: spacing.md,
     right: spacing.md,
-    bottom: spacing.xl,
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "rgba(10,12,16,0.92)",
+  },
+  modalLocate: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderAccent,
-    backgroundColor: colors.primaryMuted,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  locateIcon: {
+    color: colors.primary,
+    fontSize: typography.body,
+    fontWeight: "900",
+  },
+  confirmLocationButton: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+  },
+  confirmLocationText: {
+    color: colors.text,
+    fontSize: typography.body,
+    fontWeight: "900",
   },
   noxaMarker: {
     width: 28,
