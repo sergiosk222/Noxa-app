@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect } from 'react';
 import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -22,21 +22,27 @@ export function NoxaAuthField({
   style,
   ...props
 }: NoxaAuthFieldProps) {
-  const [focused, setFocused] = useState(false);
+  useEffect(() => {
+    console.log(`[AuthField:${label}] mounted`);
+
+    return () => {
+      console.log(`[AuthField:${label}] unmounted`);
+    };
+  }, [label]);
 
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}>
+      <View style={[styles.inputShell, error && styles.inputError]}>
         <TextInput
           {...props}
           accessibilityLabel={label}
           onBlur={(event) => {
-            setFocused(false);
+            console.log(`[AuthField:${label}] blur`);
             onBlur?.(event);
           }}
           onFocus={(event) => {
-            setFocused(true);
+            console.log(`[AuthField:${label}] focus`);
             onFocus?.(event);
           }}
           placeholderTextColor={colors.textSubtle}
@@ -83,13 +89,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  inputFocused: {
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
   },
   inputError: {
     borderColor: colors.borderAccent,

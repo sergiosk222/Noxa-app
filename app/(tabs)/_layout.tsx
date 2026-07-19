@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { colors } from '@/src/theme/colors';
@@ -21,13 +22,21 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSubtle,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 64 + insets.bottom,
+            paddingBottom: Math.max(insets.bottom, spacing.sm),
+          },
+        ],
         tabBarItemStyle: styles.tabItem,
         tabBarButton: HapticTab,
         tabBarHideOnKeyboard: true,
@@ -82,9 +91,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 84,
     paddingTop: 10,
-    paddingBottom: spacing.sm,
     backgroundColor: colors.glass,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,

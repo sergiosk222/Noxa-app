@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Defs, LinearGradient, Rect, Stop, Svg } from 'react-native-svg';
 
 import { NoxaCompactLogo } from '@/src/components/brand';
+import { useResponsive } from '@/src/hooks/useResponsive';
 import { NoxaButton } from '@/src/components/ui';
 import { colors, spacing, typography } from '@/src/theme';
 
@@ -13,6 +14,19 @@ const WELCOME_HERO_IMAGE =
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const responsive = useResponsive();
+
+  const headlineSize = Math.min(
+    64,
+    Math.max(44, responsive.width * 0.144),
+  );
+
+  const descriptionMaxWidth = responsive.isTablet
+    ? 420
+    : Math.min(
+        300,
+        responsive.width - responsive.gutter * 2,
+      );
 
   return (
     <View style={styles.screen}>
@@ -40,22 +54,50 @@ export default function WelcomeScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Math.max(insets.top, spacing.md) + spacing.md,
-            paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.lg,
+            width: '100%',
+            maxWidth: responsive.contentMaxWidth,
+            alignSelf: 'center',
+            paddingHorizontal: responsive.gutter,
+            paddingTop:
+              Math.max(insets.top, spacing.md) +
+              spacing.md,
+            paddingBottom:
+              Math.max(insets.bottom, spacing.md) +
+              spacing.lg,
           },
         ]}
         showsVerticalScrollIndicator={false}>
         <NoxaCompactLogo />
 
-        <View style={styles.heroSpace} />
+        <View
+          style={[
+            styles.heroSpace,
+            {
+              minHeight: responsive.isCompactHeight
+                ? 72
+                : responsive.vertical(150),
+            },
+          ]}
+        />
 
         <View style={styles.bottomContent}>
           <Text style={styles.eyebrow}>Premium Automotive Community</Text>
-          <Text style={styles.headline}>
+          <Text
+            style={[
+              styles.headline,
+              {
+                fontSize: headlineSize,
+                lineHeight: headlineSize * 0.96,
+              },
+            ]}>
             YOUR WORLD.{'\n'}
             <Text style={styles.headlineAccent}>ON THE ROAD.</Text>
           </Text>
-          <Text style={styles.description}>
+          <Text
+            style={[
+              styles.description,
+              { maxWidth: descriptionMaxWidth },
+            ]}>
             Connect with passionate drivers. Discover exclusive events. Join crews that match your drive.
           </Text>
 
@@ -87,11 +129,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    paddingHorizontal: 26,
   },
   heroSpace: {
     flex: 1,
-    minHeight: 150,
   },
   bottomContent: {
     width: '100%',
@@ -109,16 +149,13 @@ const styles = StyleSheet.create({
   headline: {
     color: colors.text,
     fontFamily: typography.fontFamily.display,
-    fontSize: 56,
     fontWeight: '900',
     letterSpacing: 0.4,
-    lineHeight: 54,
   },
   headlineAccent: {
     color: colors.primary,
   },
   description: {
-    maxWidth: 300,
     marginTop: spacing.md,
     marginBottom: spacing.xxl,
     color: 'rgba(240,240,244,0.62)',

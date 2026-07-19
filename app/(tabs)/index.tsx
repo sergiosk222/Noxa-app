@@ -97,7 +97,7 @@ const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let driverLocationsMapChannelSequence = 0;
 
-const TAB_BAR_HEIGHT = 84;
+const TAB_BAR_HEIGHT = 64;
 const TAB_BAR_BOTTOM_GAP = 0;
 const FLOATING_GAP = spacing.sm;
 const MAP_FILTERS: { id: MapFilter; label: string }[] = [
