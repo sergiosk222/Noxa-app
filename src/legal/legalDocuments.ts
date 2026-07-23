@@ -82,7 +82,7 @@ export const privacyPolicy: LegalDocument = {
       bullets: [
         'Other NOXA users receive profile, content, crew, event, and Live Drive information only as allowed by the relevant visibility and membership rules. Content marked public may be broadly visible within NOXA.',
         'Supabase provides authentication, database, storage, serverless functions, and realtime infrastructure as a service provider acting on our instructions.',
-        'Apple Maps or Google Maps may process map and device data under their own terms. OpenRouteService receives route origin and destination coordinates when you request an event route.',
+        'Mapbox may process map and device data under its own terms. OpenRouteService receives route origin and destination coordinates when you request an event route.',
         'Image delivery and platform providers, including operating-system services and third-party media hosts used by the app, may receive ordinary connection data such as IP address and user agent when content loads.',
         'Information may be disclosed when reasonably necessary to comply with law, protect users, investigate abuse, or protect NOXA and others. If NOXA is reorganized or transferred, data may transfer subject to this policy and applicable law.',
       ],
@@ -206,7 +206,7 @@ export const termsOfService: LegalDocument = {
     {
       title: '10. Third-party services',
       paragraphs: [
-        'NOXA relies on third-party services such as Supabase, Apple Maps, Google Maps, OpenRouteService, operating-system services, and media delivery providers. Their availability and data practices are governed by their own terms and policies. NOXA is not responsible for third-party services outside our control.',
+        'NOXA relies on third-party services such as Supabase, Mapbox, OpenRouteService, operating-system services, and media delivery providers. Their availability and data practices are governed by their own terms and policies. NOXA is not responsible for third-party services outside our control.',
       ],
     },
     {

@@ -15,18 +15,15 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, {
-  Marker,
-  PROVIDER_GOOGLE,
-  type MapPressEvent,
-  type Region,
-} from "react-native-maps";
 
 import {
   NoxaButton,
   NoxaInput,
   NoxaScreen,
 } from "@/src/components/ui";
+import { MapboxEventLocationPickerCompat } from "@/src/features/mapbox/MapboxEventLocationPickerCompat";
+import { NOXA_FALLBACK_COORDINATE } from "@/src/features/mapbox/config";
+import type { LatLng } from "@/src/features/mapbox/types";
 import { supabase } from "@/src/lib/supabase";
 import { colors, radius, shadows, spacing, typography } from "@/src/theme";
 
@@ -60,11 +57,8 @@ type EventRow = {
   longitude: number | null;
 };
 type PickerTarget = "startDate" | "startTime" | "endDate" | "endTime";
-type DraftLocation = { latitude: number; longitude: number };
 type ManagedCrew = { id: string; name: string; logo_url: string | null };
 
-const THESSALONIKI = { latitude: 40.6401, longitude: 22.9444 };
-const MAP_DELTA = { latitudeDelta: 0.035, longitudeDelta: 0.035 };
 const eventCategories: { value: EventCategory; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { value: "meet", label: "MEET", icon: "people-outline" },
   { value: "drive", label: "DRIVE", icon: "navigate-outline" },
@@ -135,9 +129,6 @@ function mergeTimePart(base: Date | null, picked: Date) {
 function formatCoords(latitude: number, longitude: number) {
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
 }
-function toRegion(point: DraftLocation): Region {
-  return { ...point, ...MAP_DELTA };
-}
 function buildAddress(
   addresses: Location.LocationGeocodedAddress[],
   latitude: number,
@@ -185,11 +176,8 @@ export default function EventEditorScreen() {
   const [saving, setSaving] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [mapModalVisible, setMapModalVisible] = useState(false);
-  const [draftLocation, setDraftLocation] = useState<DraftLocation | null>(
-    null,
-  );
-  const [draftRegion, setDraftRegion] = useState<Region>(
-    toRegion(THESSALONIKI),
+  const [draftLocation, setDraftLocation] = useState<LatLng>(
+    NOXA_FALLBACK_COORDINATE,
   );
   const [error, setError] = useState<string | null>(null);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
@@ -364,26 +352,21 @@ export default function EventEditorScreen() {
         : null;
     if (existing) {
       setDraftLocation(existing);
-      setDraftRegion(toRegion(existing));
       setMapModalVisible(true);
       return;
     }
-    setDraftLocation(null);
-    setDraftRegion(toRegion(THESSALONIKI));
+    setDraftLocation(NOXA_FALLBACK_COORDINATE);
     setMapModalVisible(true);
+    setIsLocating(true);
     try {
       const point = await getCurrentPoint();
-      setDraftRegion(toRegion(point));
+      setDraftLocation(point);
     } catch {
-      /* keep fallback viewport without selecting it */
+      /* Permission or services unavailable: keep the safe fallback. */
+    } finally {
+      setIsLocating(false);
     }
   }, [form.latitude, form.longitude, getCurrentPoint]);
-
-  const setDraftFromMap = useCallback((event: MapPressEvent) => {
-    const point = event.nativeEvent.coordinate;
-    setDraftLocation(point);
-    setDraftRegion(toRegion(point));
-  }, []);
 
   const useCurrentLocationInModal = useCallback(async () => {
     if (isLocating) return;
@@ -391,7 +374,6 @@ export default function EventEditorScreen() {
     try {
       const point = await getCurrentPoint();
       setDraftLocation(point);
-      setDraftRegion(toRegion(point));
     } catch {
       Alert.alert(
         "Location unavailable",
@@ -402,33 +384,24 @@ export default function EventEditorScreen() {
     }
   }, [getCurrentPoint, isLocating]);
 
-  const confirmDraftLocation = useCallback(async () => {
-    if (!draftLocation) {
-      setError("Choose the exact event location on the map.");
-      return;
-    }
+  const confirmDraftLocation = useCallback(async (coordinate: LatLng) => {
     setIsLocating(true);
+    let locationName: string;
     try {
-      const locationName = await resolveLocationName(
-        draftLocation.latitude,
-        draftLocation.longitude,
-      );
-      setForm((current) => ({
-        ...current,
-        locationName,
-        latitude: draftLocation.latitude,
-        longitude: draftLocation.longitude,
-      }));
-      setMapModalVisible(false);
+      locationName = await resolveLocationName(coordinate.latitude, coordinate.longitude);
     } catch {
-      Alert.alert(
-        "Location unavailable",
-        "We could not name this point. Try again.",
-      );
-    } finally {
-      setIsLocating(false);
+      locationName = formatCoords(coordinate.latitude, coordinate.longitude);
     }
-  }, [draftLocation, resolveLocationName]);
+    setDraftLocation(coordinate);
+    setForm((current) => ({
+      ...current,
+      locationName,
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+    }));
+    setMapModalVisible(false);
+    setIsLocating(false);
+  }, [resolveLocationName]);
 
   const validate = useCallback(() => {
     const titleValue = form.title.trim();
@@ -856,48 +829,13 @@ export default function EventEditorScreen() {
           visible={mapModalVisible}
           onRequestClose={() => setMapModalVisible(false)}
         >
-          <View style={styles.mapModal}>
-            <MapView
-              style={StyleSheet.absoluteFill}
-              region={draftRegion}
-              onRegionChangeComplete={setDraftRegion}
-              onPress={setDraftFromMap}
-              provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-              userInterfaceStyle="dark"
-              showsUserLocation={false}
-              toolbarEnabled={false}
-            >
-              {draftLocation ? (
-                <Marker
-                  coordinate={draftLocation}
-                  draggable
-                  onDragEnd={(event) =>
-                    setDraftLocation(event.nativeEvent.coordinate)
-                  }
-                >
-                  <View style={styles.noxaMarker} />
-                </Marker>
-              ) : null}
-            </MapView>
-            <View style={styles.mapModalHeader}>
-              <Pressable onPress={() => setMapModalVisible(false)}>
-                <Text style={styles.pickerAction}>Cancel</Text>
-              </Pressable>
-              <Text style={styles.pickerTitle}>Exact event location</Text>
-              <Pressable onPress={confirmDraftLocation}>
-                <Text style={styles.pickerDone}>Confirm Location</Text>
-              </Pressable>
-            </View>
-            <Pressable
-              onPress={useCurrentLocationInModal}
-              disabled={isLocating}
-              style={styles.modalLocate}
-            >
-              <Text style={styles.locationActionText}>
-                {isLocating ? "Locating…" : "Use Current Location"}
-              </Text>
-            </Pressable>
-          </View>
+          <MapboxEventLocationPickerCompat
+            initialCoordinate={draftLocation}
+            isLocating={isLocating}
+            onCancel={() => setMapModalVisible(false)}
+            onConfirm={confirmDraftLocation}
+            onUseCurrentLocation={useCurrentLocationInModal}
+          />
         </Modal>
         <Modal
           animationType="fade"
@@ -1460,41 +1398,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   pressed: { opacity: 0.86, transform: [{ translateY: 1 }, { scale: 0.98 }] },
-  mapModal: { flex: 1, backgroundColor: colors.background },
-  mapModalHeader: {
-    position: "absolute",
-    top: spacing.xl,
-    left: spacing.md,
-    right: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "rgba(10,12,16,0.90)",
-  },
-  modalLocate: {
-    position: "absolute",
-    right: spacing.md,
-    bottom: spacing.xl,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.borderAccent,
-    backgroundColor: colors.primaryMuted,
-  },
-  noxaMarker: {
-    width: 28,
-    height: 28,
-    borderRadius: radius.pill,
-    borderWidth: 3,
-    borderColor: colors.text,
-    backgroundColor: colors.primary,
-  },
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",

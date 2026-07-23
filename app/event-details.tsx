@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -14,9 +13,9 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 import { NoxaButton, NoxaScreen } from "@/src/components/ui";
+import { MapboxEventPreviewCompat } from "@/src/features/mapbox/MapboxEventPreviewCompat";
 import {
   eventLifecycle,
   formatEventDate,
@@ -698,24 +697,12 @@ export default function EventDetailsScreen() {
                   onPress={routeOnNoxaMap}
                   style={({ pressed }) => [styles.mapPreview, pressed && styles.pressed]}
                 >
-                  <MapView
-                    initialRegion={{
+                  <MapboxEventPreviewCompat
+                    coordinate={{
                       latitude: event.latitude,
                       longitude: event.longitude,
-                      latitudeDelta: 0.025,
-                      longitudeDelta: 0.025,
                     }}
-                    pitchEnabled={false}
-                    pointerEvents="none"
-                    provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-                    rotateEnabled={false}
-                    scrollEnabled={false}
-                    style={StyleSheet.absoluteFill}
-                    toolbarEnabled={false}
-                    zoomEnabled={false}
-                  >
-                    <Marker coordinate={{ latitude: event.latitude, longitude: event.longitude }} />
-                  </MapView>
+                  />
                   <View style={styles.mapShade} />
                   <View style={styles.mapRouteBadge}>
                     <Ionicons name="navigate" size={14} color={colors.text} />

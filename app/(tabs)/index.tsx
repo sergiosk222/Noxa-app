@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   AppState,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,15 +13,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Defs, LinearGradient, Rect, Stop, Svg } from "react-native-svg";
-import MapView, {
-  Marker,
-  Polyline,
-  PROVIDER_GOOGLE,
-  type MapViewProps,
-  type Region,
-} from "react-native-maps";
 
 import { NoxaCompactLogo } from "@/src/components/brand";
+import { MapboxLiveMapCompat } from "@/src/features/mapbox/MapboxLiveMapCompat";
+import type {
+  LiveMapHandle,
+  MapRegion,
+  MapboxDriver,
+  MapboxEvent,
+} from "@/src/features/mapbox/types";
 import {
   LIVE_DRIVE_TASK_NAME,
   getLiveDriveSession,
@@ -137,64 +136,6 @@ const VISIBILITY_MODES: {
   },
 ];
 
-const androidNoxaMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#0C0C10" }] },
-  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#6E6E78" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#06060A" }] },
-  {
-    featureType: "administrative",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#26262D" }],
-  },
-  {
-    featureType: "landscape",
-    elementType: "geometry",
-    stylers: [{ color: "#0C0C10" }],
-  },
-  {
-    featureType: "landscape.natural",
-    elementType: "geometry",
-    stylers: [{ color: "#111116" }],
-  },
-  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#111B17" }],
-  },
-  { featureType: "poi.school", stylers: [{ visibility: "off" }] },
-  { featureType: "poi.shopping_mall", stylers: [{ visibility: "off" }] },
-  { featureType: "poi.sports_complex", stylers: [{ visibility: "off" }] },
-  { featureType: "poi.tourist_attraction", stylers: [{ visibility: "off" }] },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#26262D" }],
-  },
-  {
-    featureType: "road.arterial",
-    elementType: "geometry",
-    stylers: [{ color: "#303038" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#3A3A43" }],
-  },
-  {
-    featureType: "road.local",
-    elementType: "geometry",
-    stylers: [{ color: "#1F1F25" }],
-  },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#080C14" }],
-  },
-] satisfies MapViewProps["customMapStyle"];
-
 function HeaderAction({
   icon,
   accessibilityLabel,
@@ -249,14 +190,14 @@ function MapFilterBar({
   );
 }
 
-function eventRegion(event: EventMarkerRow): Region {
+function eventRegion(event: EventMarkerRow): MapRegion {
   return {
     latitude: event.latitude,
     longitude: event.longitude,
     ...DEFAULT_DELTA,
   };
 }
-function pointRegion(point: LatLng): Region {
+function pointRegion(point: LatLng): MapRegion {
   return { ...point, ...DEFAULT_DELTA };
 }
 
@@ -408,28 +349,6 @@ function EventCard({
   );
 }
 
-function DriverMarker({ driver }: { driver: ActiveDriver }) {
-  const label = driverLabel(driver);
-  return (
-    <Marker
-      coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
-      accessibilityLabel={`${label} is visible on the NOXA map`}
-      onPress={() =>
-        router.push({
-          pathname: "/driver-profile/[id]",
-          params: { id: driver.user_id },
-        })
-      }
-      title={label}
-    >
-      <View style={styles.driverMarker}>
-        <View style={styles.driverMarkerAccent} />
-        <Ionicons name="car-sport" size={15} color={colors.text} />
-      </View>
-    </Marker>
-  );
-}
-
 function RouteCard({
   event,
   route,
@@ -505,7 +424,7 @@ export default function LiveMapScreen() {
     mapMode?: string | string[];
   }>();
   const insets = useSafeAreaInsets();
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<LiveMapHandle | null>(null);
   const [driverLocation, setDriverLocation] = useState<LatLng | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [events, setEvents] = useState<EventMarkerRow[]>([]);
@@ -551,7 +470,7 @@ export default function LiveMapScreen() {
   const initialRegion = useMemo(() => pointRegion(THESSALONIKI), []);
 
   const animateTo = useCallback(
-    (region: Region) => mapRef.current?.animateToRegion(region, 550),
+    (region: MapRegion) => mapRef.current?.animateToRegion(region, 550),
     [],
   );
 
@@ -1087,6 +1006,41 @@ export default function LiveMapScreen() {
     animateTo(point ? pointRegion(point) : pointRegion(THESSALONIKI));
   }, [animateTo, driverLocation, loadDriverLocation]);
 
+  const mapboxDrivers = useMemo<MapboxDriver[]>(
+    () =>
+      activeDrivers.map((driver) => ({
+        user_id: driver.user_id,
+        latitude: driver.latitude,
+        longitude: driver.longitude,
+        label: driverLabel(driver),
+        avatar_url: driver.profile?.avatar_url ?? null,
+      })),
+    [activeDrivers],
+  );
+  const mapboxEvents = useMemo<MapboxEvent[]>(
+    () =>
+      events.map((event) => ({
+        id: event.id,
+        title: event.title,
+        latitude: event.latitude,
+        longitude: event.longitude,
+      })),
+    [events],
+  );
+  const openDriverProfile = useCallback((driverId: string) => {
+    router.push({
+      pathname: "/driver-profile/[id]",
+      params: { id: driverId },
+    });
+  }, []);
+  const selectMapboxEvent = useCallback(
+    (event: MapboxEvent) => {
+      const fullEvent = events.find((candidate) => candidate.id === event.id);
+      if (fullEvent) selectEvent(fullEvent);
+    },
+    [events, selectEvent],
+  );
+
   const headerTop = insets.top + spacing.sm;
   const headerBottom = headerTop + 34;
   const filtersTop = headerBottom + spacing.sm;
@@ -1112,73 +1066,19 @@ export default function LiveMapScreen() {
 
   return (
     <View style={styles.screen}>
-      <MapView
+      <MapboxLiveMapCompat
         ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
+        activeDrivers={mapboxDrivers}
+        driverLocation={driverLocation}
+        events={mapboxEvents}
         initialRegion={initialRegion}
-        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
-        userInterfaceStyle="dark"
-        mapType={Platform.OS === "ios" ? "mutedStandard" : "standard"}
-        customMapStyle={
-          Platform.OS === "android" ? androidNoxaMapStyle : undefined
-        }
-        showsUserLocation={Boolean(driverLocation)}
-        showsMyLocationButton={false}
-        showsPointsOfInterest={false}
-        showsBuildings={false}
-        showsTraffic={false}
-        showsIndoors={false}
-        showsScale={false}
-        showsCompass={false}
-        toolbarEnabled={false}
-      >
-        {route ? (
-          <>
-            <Polyline
-              coordinates={route.coordinates}
-              strokeColor="rgba(31,6,8,0.78)"
-              strokeWidth={9}
-              lineCap="round"
-              lineJoin="round"
-            />
-            <Polyline
-              coordinates={route.coordinates}
-              strokeColor={colors.primary}
-              strokeWidth={5}
-              lineCap="round"
-              lineJoin="round"
-            />
-          </>
-        ) : null}
-        {mapFilter !== "events"
-          ? activeDrivers.map((driver) => (
-              <DriverMarker key={driver.user_id} driver={driver} />
-            ))
-          : null}
-        {mapFilter !== "drivers" || isRouteMode
-          ? events.map((event) => (
-              <Marker
-                key={event.id}
-                coordinate={{
-                  latitude: event.latitude,
-                  longitude: event.longitude,
-                }}
-                onPress={() => selectEvent(event)}
-                title={event.title}
-              >
-                <View
-                  style={[
-                    styles.markerDot,
-                    selectedEvent?.id === event.id &&
-                      styles.markerDotSelected,
-                  ]}
-                >
-                  <Ionicons name="flag" size={13} color={colors.text} />
-                </View>
-              </Marker>
-            ))
-          : null}
-      </MapView>
+        isRouteMode={isRouteMode}
+        mapFilter={mapFilter}
+        onDriverPress={openDriverProfile}
+        onEventPress={selectMapboxEvent}
+        route={route}
+        selectedEventId={selectedEvent?.id ?? null}
+      />
 
       <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
         <Svg
